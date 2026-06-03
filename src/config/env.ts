@@ -39,6 +39,9 @@ const envSchema = z.object({
 
   VEXA_JOIN_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(3000),
   VEXA_JOIN_TIMEOUT_MS: z.coerce.number().int().positive().default(120000),
+
+  /** Max email-triggered joins per sender per hour; 0 = unlimited. */
+  EMAIL_JOIN_RATE_LIMIT_PER_HOUR: z.coerce.number().int().nonnegative().default(10),
 });
 
 export type Env = z.infer<typeof envSchema>;

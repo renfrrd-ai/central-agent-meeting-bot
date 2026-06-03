@@ -16,6 +16,7 @@ export interface JoinOptions {
   botName?: string;
   force?: boolean;
   correlationId?: string;
+  source?: "api" | "email";
 }
 
 export interface OrchestratorDeps {
@@ -45,7 +46,7 @@ export class JoinOrchestrator {
 
     logLifecycle(this.logger, "trigger_received", {
       correlationId,
-      source: "api",
+      source: options.source ?? "api",
       platform: meetingRef.platform,
       native_meeting_id: meetingRef.native_meeting_id,
     });
