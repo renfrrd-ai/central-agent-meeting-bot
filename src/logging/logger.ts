@@ -18,7 +18,12 @@ export type LifecycleEvent =
   | "vexa_status"
   | "join_succeeded"
   | "join_failed"
-  | "duplicate_bot";
+  | "duplicate_bot"
+  | "fallback_started"
+  | "fallback_succeeded"
+  | "fallback_failed"
+  | "shutdown_started"
+  | "bot_stopped";
 
 export function logLifecycle(
   logger: Logger,
