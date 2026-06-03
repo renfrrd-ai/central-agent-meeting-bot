@@ -2,7 +2,7 @@
 
 This guide explains how the bot inbox triggers automatic meeting joins, and how **Resend** and **Render** fit in. No prior knowledge of the codebase is required.
 
-For the high-level product diagram, see [architecture.md](architecture.md). For implementation tasks, see [TODO.md](../TODO.md).
+For the high-level product diagram, see [architecture.md](architecture.md). For setup steps, see [setup.md](setup.md).
 
 ---
 
@@ -207,8 +207,6 @@ Details: [Resend receiving docs](https://resend.com/docs/dashboard/receiving/int
 - [ ] `RESEND_WEBHOOK_SECRET` saved from webhook creation
 - [ ] Smoke test: invite `BOT_EMAIL` to a test Meet → bot joins
 
-Implementation tasks: [TODO.md](../TODO.md) Phases 0, 3, 4, 9.
-
 ---
 
 ## Common questions
@@ -223,7 +221,7 @@ No. Easy Mode uses `POST /api/join` or the UI at `/`.
 Resend pushes `email.received` events to your app. Without a registered URL, the orchestrator never learns that an invite arrived.
 
 **What if Vexa fails to join?**  
-Playwright fallback (see [TODO.md](../TODO.md) Phase 5).
+Playwright fallback joins Google Meet directly (see [setup.md](setup.md#playwright-fallback-google-meet)).
 
 **Is transcript / AI processing included?**  
 Not in v1 ([PRD.md](../PRD.md)).
@@ -233,7 +231,7 @@ Not in v1 ([PRD.md](../PRD.md)).
 ## Related docs
 
 - [architecture.md](architecture.md)
+- [setup.md](setup.md)
 - [PRD.md](../PRD.md)
-- [TODO.md](../TODO.md)
 - [Resend inbound email](https://resend.com/docs/dashboard/receiving/introduction)
 - [Vexa Bots API](https://docs.vexa.ai/api/bots)

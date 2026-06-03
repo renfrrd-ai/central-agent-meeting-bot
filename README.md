@@ -34,7 +34,6 @@ Advanced Mode also needs a public HTTPS URL (e.g. [ngrok](docs/setup.md#ngrok-fo
 - [Setup](docs/setup.md) — local dev, ngrok, curl examples
 - [Bot email & Resend](docs/bot-email-and-deployment.md) — Advanced Mode, custom domain MX
 - [Architecture](docs/architecture.md)
-- [TODO](TODO.md) — remaining work (Playwright fallback, etc.)
 - [PRD](PRD.md)
 
 ## Scripts
