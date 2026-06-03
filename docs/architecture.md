@@ -1,5 +1,7 @@
 # Architecture Diagram
 
+For a plain-language walkthrough of **bot email**, **Resend**, and **Render**, see [bot-email-and-deployment.md](bot-email-and-deployment.md).
+
 ```mermaid
 graph TD
     A[User / Meeting Organizer] -->|creates meeting + invites bot email| B[Google Meet]
