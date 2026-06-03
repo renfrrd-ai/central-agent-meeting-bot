@@ -3,7 +3,6 @@ import { buildApp } from "../src/app.js";
 import { loadEnv, resetEnvCache } from "../src/config/env.js";
 
 const testEnv = loadEnv({
-  API_KEY: "test-api-key",
   VEXA_API_KEY: "test-vexa-key",
   VEXA_API_BASE: "https://api.cloud.vexa.ai",
 });
@@ -25,7 +24,7 @@ describe("Easy Mode UI", () => {
     const response = await app.inject({ method: "GET", url: "/" });
     expect(response.statusCode).toBe(200);
     expect(response.headers["content-type"]).toMatch(/text\/html/);
-    expect(response.body).toContain("Send the bot to a meeting");
+    expect(response.body).toContain("Meeting bot");
   });
 
   it("serves static assets without API key", async () => {
