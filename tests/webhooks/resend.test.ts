@@ -146,3 +146,21 @@ describe("POST /webhooks/resend (not configured)", () => {
     await app.close();
   });
 });
+
+describe("GET /webhooks/resend", () => {
+  it("returns endpoint info for debugging", async () => {
+    resetEnvCache();
+    const app = Fastify({ logger: false });
+    await registerResendWebhookRoutes(app, {
+      env: testEnv,
+      logger: createLogger(testEnv),
+      orchestrator: { join: vi.fn() } as unknown as JoinOrchestrator,
+    });
+    await app.ready();
+
+    const response = await app.inject({ method: "GET", url: "/webhooks/resend" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().endpoint).toBe("/webhooks/resend");
+    await app.close();
+  });
+});
