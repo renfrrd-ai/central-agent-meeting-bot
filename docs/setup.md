@@ -101,7 +101,12 @@ curl -X POST http://localhost:3000/api/leave \
 | **Trainer demo** | Share your ngrok URL while the tunnel is up, or use **Easy Mode** so they only need the UI |
 | **Env vars** | Same as `.env` locally — ngrok does not need extra keys |
 
-Phase 4 must implement `POST /webhooks/resend` before the webhook does anything; until then use Easy Mode.
+### Advanced Mode test
+
+1. Set `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, and `BOT_EMAIL` in `.env`.
+2. Register webhook URL `https://<ngrok>/webhooks/resend` with event **`email.received`**.
+3. Send a calendar invite to `BOT_EMAIL` with a Google Meet or Teams link.
+4. Watch server logs for `email_join_triggered` and `join_succeeded`.
 
 ## Tests
 

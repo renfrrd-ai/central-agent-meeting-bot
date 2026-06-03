@@ -3,7 +3,7 @@
 Autonomous meeting bot orchestrator: joins **Google Meet** and **Microsoft Teams** via [Vexa Cloud](https://docs.vexa.ai/user_api_guide), with Playwright fallback (planned). Zoom is out of scope for this project.
 
 - **Easy Mode** — `POST /api/join` with a meeting URL
-- **Advanced Mode** — invite the bot inbox; Resend webhook triggers join (planned)
+- **Advanced Mode** — invite the bot inbox; Resend `email.received` webhook auto-joins
 
 ## Quickstart
 
