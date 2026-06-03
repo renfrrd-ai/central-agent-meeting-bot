@@ -1,6 +1,6 @@
 # Bot Email, Resend, and Render — How It Works
 
-This guide explains how **`bot@centralagent.ai`** triggers automatic meeting joins, and how **Render** fits in. No prior knowledge of the codebase is required.
+This guide explains how the bot inbox triggers automatic meeting joins, and how **Resend** and **Render** fit in. No prior knowledge of the codebase is required.
 
 For the high-level product diagram, see [architecture.md](architecture.md). For implementation tasks, see [TODO.md](../TODO.md).
 
@@ -8,38 +8,64 @@ For the high-level product diagram, see [architecture.md](architecture.md). For 
 
 ## What problem this solves
 
-Organizers usually have two ways to get a bot into a meeting:
+Organizers have two ways to get a bot into a meeting:
 
-1. **Easy Mode** — Paste a meeting URL into an API (`POST /api/join`).
+1. **Easy Mode** — Submit a meeting URL via API (`POST /api/join`).
 2. **Advanced Mode** — Add the bot’s email as a calendar guest; the bot joins when the invite arrives.
 
-Advanced Mode is what this document focuses on.
+Advanced Mode uses **Resend webhooks**: when mail arrives, Resend POSTs to your app immediately.
 
 ---
 
-## What `bot@centralagent.ai` actually is
+## What the bot email address is
 
-`bot@centralagent.ai` is **not** a Gmail inbox you log into.
+The bot inbox (configured as `BOT_EMAIL` in `.env`) is **not** a Gmail inbox you log into.
 
-It is a **dedicated email address** that:
+It is a **dedicated address** that:
 
 - Appears on calendar invites like any other guest
-- Receives `.ics` calendar files and meeting links in email
-- Is handled **programmatically** by our backend — never by a human reading mail
+- Receives `.ics` files and meeting links
+- Is handled **programmatically** by the orchestrator
 
-The address is configured in `.env` as `BOT_EMAIL`. Organizers invite exactly that address when scheduling Google Meet, Teams, or Zoom calls.
+Examples:
+
+- Resend-managed: `anything@your-id.resend.app` (from Resend dashboard → Receiving)
+- Custom domain: `bot@centralagent.ai` (requires MX records)
 
 ---
 
-## The three services involved
+## The services involved
 
-| Service | What it does | Analogy |
-|---------|----------------|---------|
-| **Resend** | Receives email for your domain and notifies your app | The mailroom |
-| **Render** | Runs your orchestrator app 24/7 on a public HTTPS URL | The server that reacts to mail |
-| **Vexa Cloud** | Launches the actual meeting bot into Meet/Teams/Zoom | The robot that joins the call |
+| Service | Role |
+|---------|------|
+| **Resend** | Receives inbound email and sends `email.received` webhooks |
+| **Orchestrator** (this app) | Handles webhooks, parses invites, calls Vexa |
+| **Render** (or any host) | Runs the orchestrator on a public HTTPS URL |
+| **Vexa Cloud** | Launches the meeting bot into Meet/Teams/Zoom |
 
-**Important:** Render does **not** receive email. Only Resend receives mail. Render only receives **webhooks** (HTTP callbacks) from Resend.
+Render does **not** receive email. Resend receives mail, then POSTs to your orchestrator’s webhook endpoint.
+
+---
+
+## Easy Mode vs Advanced Mode
+
+| | Easy Mode | Advanced Mode |
+|---|-----------|---------------|
+| **Trigger** | HTTP API with meeting URL | Calendar invite to `BOT_EMAIL` |
+| **Resend required?** | No | Yes (`RESEND_API_KEY` + webhook) |
+| **Public HTTPS URL required?** | No | Yes (for `/webhooks/resend`) |
+| **Join logic** | Same — both call Vexa | Same |
+
+Easy Mode minimum env: `VEXA_API_KEY`, `API_KEY`, `VEXA_API_BASE`.
+
+```bash
+curl -X POST http://localhost:3000/api/join \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"meetingUrl":"https://meet.google.com/abc-defg-hij"}'
+```
+
+Advanced Mode additionally needs: `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, and a registered webhook URL.
 
 ---
 
@@ -48,199 +74,223 @@ The address is configured in `.env` as `BOT_EMAIL`. Organizers invite exactly th
 ```mermaid
 sequenceDiagram
   participant Organizer
-  participant Calendar as Calendar_Google_etc
-  participant DNS as DNS_MX
+  participant Calendar
   participant Resend
-  participant Render as Orchestrator_on_Render
-  participant Vexa as Vexa_Cloud
+  participant App as Orchestrator
+  participant Vexa
   participant Meet as Meeting
 
-  Organizer->>Calendar: Schedule meeting + invite bot@centralagent.ai
-  Calendar->>DNS: Send email to bot@centralagent.ai
-  DNS->>Resend: Deliver via MX records
-  Resend->>Render: POST /webhooks/resend event email.received
-  Render->>Render: Verify signature + allowlist sender
-  Render->>Render: Extract Meet/Teams/Zoom link from invite
-  Render->>Vexa: POST /bots with meeting ID
-  Vexa->>Meet: Bot joins the call
+  Organizer->>Calendar: Invite BOT_EMAIL
+  Calendar->>Resend: Deliver invite email
+  Resend->>App: POST /webhooks/resend
+  App->>App: Verify signature + allowlist
+  App->>Resend: receiving.get(email_id)
+  App->>Vexa: POST /bots
+  Vexa->>Meet: Bot joins
 ```
 
 ### Step by step
 
-1. **Organizer** creates a Google Meet (or other platform) and adds `bot@centralagent.ai` as a guest.
-2. **Calendar** sends an invite email to that address.
-3. **DNS (MX records)** for `centralagent.ai` tell the internet: “deliver mail for this domain to Resend.”
-4. **Resend** accepts the message and immediately sends an HTTP POST to your app — a **webhook** — saying “email received.”
-5. **Orchestrator on Render** (this repo’s app):
-   - Verifies the webhook is really from Resend (`RESEND_WEBHOOK_SECRET`)
-   - Checks the sender is on your allowlist (`ALLOWED_INVITE_SENDERS`)
-   - Parses the email body / calendar attachment for a meeting link
-   - Calls **Vexa Cloud** to send a bot to that meeting
-6. **Vexa** runs the bot; it appears in the meeting like a normal participant.
+1. Organizer invites `BOT_EMAIL` on a calendar event with a Meet/Teams/Zoom link.
+2. Mail is delivered to Resend (via `@xxx.resend.app` or custom domain MX).
+3. Resend POSTs an `email.received` event to `https://your-host/webhooks/resend`.
+4. Orchestrator verifies the webhook signature (`RESEND_WEBHOOK_SECRET`).
+5. Orchestrator checks the sender against `INVITE_SENDER_MODE` allowlist.
+6. Orchestrator fetches full email content via `RESEND_API_KEY` and extracts the meeting link.
+7. Orchestrator calls Vexa; the bot joins the meeting.
 
 ---
 
-## How Render connects (and what it does not do)
+## Webhook endpoint URL
 
-When you deploy this project to [Render](https://render.com) as a **Web Service**, you get a URL such as:
+Resend needs a **public HTTPS URL** to deliver events, for example:
 
 ```text
-https://central-agent-meeting-bot.onrender.com
+https://your-app.onrender.com/webhooks/resend
 ```
 
-Render’s job:
+| Without registered URL | With registered URL |
+|------------------------|---------------------|
+| Resend receives the invite | Same |
+| Your app is not notified | Resend POSTs `email.received` |
+| Bot does not auto-join | App parses invite and calls Vexa |
 
-- Keep the Node.js orchestrator running
-- Expose HTTPS endpoints:
-  - `GET /health` — health check
-  - `POST /api/join` — Easy Mode (URL trigger)
-  - `POST /webhooks/resend` — Advanced Mode (email trigger)
-- Inject environment variables from the Render dashboard (API keys, secrets)
+Register in Resend → Webhooks, or via `POST https://api.resend.com/webhooks`.
 
-You register the webhook URL in **Resend’s dashboard** (or via their API):
+For local development, expose your app with a tunnel (ngrok, Tailscale Funnel) and register that URL with Resend.
+
+---
+
+## Webhook secret (`RESEND_WEBHOOK_SECRET`)
+
+| Mode | Need secret? |
+|------|--------------|
+| Easy Mode only | No |
+| Advanced Mode (webhook) | Yes |
+
+Your webhook endpoint is public. The secret (`whsec_...`) verifies each request came from Resend:
 
 ```text
-https://central-agent-meeting-bot.onrender.com/webhooks/resend
+Resend signs request → app verifies with RESEND_WEBHOOK_SECRET → process or reject
 ```
 
-```mermaid
-flowchart LR
-  subgraph mail [Email delivery]
-    Invite[Calendar invite email]
-    MX[MX records centralagent.ai]
-    Resend[Resend receiving]
-    Invite --> MX --> Resend
-  end
+Without verification, anyone could POST fake events and try to trigger bot joins.
 
-  subgraph hosting [Render hosting]
-    Webhook["POST /webhooks/resend"]
-    API["POST /api/join"]
-    JoinLogic[Parse link + call Vexa]
-    Resend -->|HTTPS webhook| Webhook
-    Webhook --> JoinLogic
-    API --> JoinLogic
-  end
-
-  subgraph bots [Meeting bots]
-    Vexa[Vexa Cloud API]
-    Meet[Google Meet / Teams / Zoom]
-    JoinLogic --> Vexa --> Meet
-  end
-```
-
-Render is **never** in the SMTP/email path. It only receives HTTP requests after Resend has already received the mail.
+**How to get it:** Create a webhook in the [Resend dashboard](https://resend.com/webhooks) or via API. Resend returns `signing_secret` **once** — save it to `.env`. If lost, delete the webhook and create a new one.
 
 ---
 
-## Easy Mode vs Advanced Mode
+## Invite sender allowlist
 
-| | Easy Mode | Advanced Mode |
-|---|-----------|---------------|
-| **Trigger** | HTTP API with meeting URL | Calendar invite to `bot@centralagent.ai` |
-| **Who initiates** | Developer, script, or internal tool | Meeting organizer |
-| **Render endpoint** | `POST /api/join` | `POST /webhooks/resend` |
-| **Resend required?** | No | Yes |
-| **Same join logic?** | Yes — both end up calling Vexa | Yes |
+Control who can trigger a join by email via `INVITE_SENDER_MODE`:
+
+| Mode | Config | Who can trigger a join |
+|------|--------|------------------------|
+| **strict** | `ALLOWED_INVITE_SENDERS` | Listed exact emails only |
+| **domain** | `ALLOWED_INVITE_DOMAINS` + optional `ALLOWED_INVITE_SENDERS` | Anyone at listed domains, plus extra emails |
+| **open** | — | Anyone who invites the bot |
+
+### Examples
+
+```bash
+# Specific organizers only
+INVITE_SENDER_MODE=strict
+ALLOWED_INVITE_SENDERS=alice@yourcompany.com,bob@yourcompany.com
+
+# Anyone at your organization
+INVITE_SENDER_MODE=domain
+ALLOWED_INVITE_DOMAINS=yourcompany.com
+
+# Organization + one external partner
+INVITE_SENDER_MODE=domain
+ALLOWED_INVITE_DOMAINS=yourcompany.com
+ALLOWED_INVITE_SENDERS=partner@gmail.com
+
+# No sender restrictions
+INVITE_SENDER_MODE=open
+```
+
+With `open`, any sender who knows `BOT_EMAIL` can trigger a join. Prefer `strict` or `domain` when the bot address is widely known.
+
+Implementation: `src/email/sender-allowlist.ts` (TODO Phase 4).
 
 ---
 
-## Environment variables (what each one is for)
+## Environment variables
 
-Copy [`.env.example`](../.env.example) to `.env` locally, or set the same keys in Render’s **Environment** tab for production.
+Copy [`.env.example`](../.env.example) to `.env`, or set the same keys on your host (e.g. Render **Environment** tab).
 
 | Variable | Purpose |
 |----------|---------|
-| `BOT_EMAIL` | Address organizers invite (e.g. `bot@centralagent.ai`) |
-| `RESEND_API_KEY` | Fetch full email content from Resend after webhook fires |
-| `RESEND_WEBHOOK_SECRET` | Cryptographically verify webhooks are from Resend |
-| `ALLOWED_INVITE_SENDERS` | Comma-separated emails allowed to trigger joins (security) |
-| `VEXA_API_BASE` | Vexa API URL (`https://api.cloud.vexa.ai` for cloud) |
-| `VEXA_API_KEY` | Authenticate with Vexa to launch bots |
-| `API_KEY` | Protect your `/api/*` routes from unauthorized use |
-| `BOT_DISPLAY_NAME` | Name shown for the bot inside the meeting |
+| `BOT_EMAIL` | Address organizers invite |
+| `RESEND_API_KEY` | Fetch received email content after webhook fires |
+| `RESEND_WEBHOOK_SECRET` | Verify `email.received` webhook signatures |
+| `INVITE_SENDER_MODE` | `strict` \| `domain` \| `open` |
+| `ALLOWED_INVITE_SENDERS` | Exact emails for `strict` or extras in `domain` |
+| `ALLOWED_INVITE_DOMAINS` | Domains for `domain` mode |
+| `VEXA_API_BASE` | Vexa API URL |
+| `VEXA_API_KEY` | Vexa authentication |
+| `API_KEY` | Protects `/api/*` routes |
+| `BOT_DISPLAY_NAME` | Bot name shown in the meeting |
 
 Never commit real secrets to git. `.env` is gitignored.
 
 ---
 
+## How Render fits in
+
+[Render](https://render.com) hosts the orchestrator with a stable HTTPS URL:
+
+```text
+https://central-agent-meeting-bot.onrender.com
+```
+
+Endpoints:
+
+- `GET /health`
+- `POST /api/join` — Easy Mode
+- `POST /webhooks/resend` — Advanced Mode
+
+```mermaid
+flowchart LR
+  subgraph mail [Email]
+    Invite[Calendar invite] --> Resend[Resend receiving]
+  end
+  subgraph host [Hosted orchestrator]
+    Webhook[POST /webhooks/resend]
+    API[POST /api/join]
+    Join[Parse link + Vexa]
+    Resend -->|email.received| Webhook
+    Webhook --> Join
+    API --> Join
+  end
+  Join --> Vexa[Vexa Cloud] --> Meet[Meeting]
+```
+
+Any host with a public HTTPS URL works the same way (Fly.io, Railway, etc.).
+
+---
+
+## Inbox setup (Resend)
+
+### Resend-managed address (no DNS)
+
+Use the address from Resend dashboard → **Receiving**: `something@abc123.resend.app`
+
+### Custom domain
+
+Add MX records per [Resend receiving docs](https://resend.com/docs/dashboard/receiving/introduction). Use a subdomain (e.g. `bot.yourdomain.com`) if the root domain already has mail elsewhere.
+
+---
+
 ## Security basics
 
-Email to an agent inbox is **untrusted input**. The orchestrator must:
-
-1. **Verify** every Resend webhook signature before processing
-2. **Allowlist** senders — only `ALLOWED_INVITE_SENDERS` can trigger a join
-3. **Ignore** auto-replies and out-of-office messages
-4. **Extract only meeting links** — never treat email body text as commands or instructions
-5. **Dedupe** invites so the same calendar event does not spawn multiple bots
-
----
-
-## Local development vs production
-
-### Production (Render + Resend)
-
-1. Deploy orchestrator to Render (HTTPS URL).
-2. Configure MX records on your domain → Resend.
-3. Create Resend webhook pointing to `https://your-app.onrender.com/webhooks/resend`.
-4. Set all env vars on Render.
-
-### Local development
-
-Resend cannot POST to `http://localhost:3000` directly. Options:
-
-- Use a **tunnel** (ngrok, Tailscale Funnel) and point the Resend webhook at the tunnel URL temporarily
-- Test **Easy Mode** locally (`POST /api/join`) without email
-- Deploy to a Render **preview/staging** service for email integration tests
-
----
-
-## DNS setup (high level)
-
-For mail to reach Resend for `@centralagent.ai`, your domain registrar or DNS provider needs **MX records** pointing to Resend’s receiving servers. Exact values come from the [Resend receiving docs](https://resend.com/docs/dashboard/receiving/introduction) when you add the domain in the Resend dashboard.
-
-Until MX is configured, invites to `bot@centralagent.ai` will not be delivered.
+1. **Verify** every webhook signature with `RESEND_WEBHOOK_SECRET`
+2. **Allowlist** senders via `INVITE_SENDER_MODE` when appropriate
+3. **Ignore** auto-replies (`Auto-Submitted`, `X-Auto-Response-Suppress`)
+4. **Extract only meeting links** — do not treat email body as commands
+5. **Dedupe** processed `email_id`s to prevent double joins
 
 ---
 
 ## Setup checklist
 
-Use this when onboarding a new environment:
+- [ ] Vexa API key ([vexa.ai/account](https://vexa.ai/account))
+- [ ] Resend API key
+- [ ] `BOT_EMAIL` set to Resend receiving address
+- [ ] Orchestrator deployed with public HTTPS URL
+- [ ] Resend webhook → `https://<your-host>/webhooks/resend`
+- [ ] `RESEND_WEBHOOK_SECRET` saved from webhook creation
+- [ ] `INVITE_SENDER_MODE` and allowlist vars configured
+- [ ] Smoke test: invite `BOT_EMAIL` to a test Meet → bot joins
 
-- [ ] Vexa Cloud account and API key ([vexa.ai/account](https://vexa.ai/account))
-- [ ] Resend account and API key
-- [ ] Domain added in Resend; MX records live for `centralagent.ai`
-- [ ] Orchestrator deployed on Render with env vars set
-- [ ] Resend webhook URL → `https://<your-render-app>/webhooks/resend`
-- [ ] `ALLOWED_INVITE_SENDERS` lists trusted organizer emails
-- [ ] Smoke test: invite `bot@centralagent.ai` to a test Meet → bot joins
-
-Implementation details and code tasks live in [TODO.md](../TODO.md) (Phases 0, 3, 4, 9).
+Implementation tasks: [TODO.md](../TODO.md) Phases 0, 3, 4, 9.
 
 ---
 
 ## Common questions
 
-**Does the bot read my whole inbox?**  
-No. Only emails delivered to `bot@centralagent.ai` via Resend, and only after passing sender allowlist checks.
+**Does the bot read a full personal inbox?**  
+No. Only mail sent to `BOT_EMAIL` via Resend, after allowlist checks.
 
-**Why not use Gmail for the bot address?**  
-You could, but Resend is built for programmatic inbound mail with instant webhooks. Gmail would require OAuth, polling, and more custom security work for the same outcome.
+**Do I need the webhook secret for Easy Mode?**  
+No. Easy Mode uses `POST /api/join` with `API_KEY`.
 
-**Why Render?**  
-Render provides a always-on HTTPS URL for webhooks and a simple way to run the Node orchestrator. Any host with a public HTTPS endpoint works the same way (Vercel, Fly.io, etc.) — Render is the planned deployment target for this project.
+**Why register a webhook URL?**  
+Resend pushes `email.received` events to your app. Without a registered URL, the orchestrator never learns that an invite arrived.
 
 **What if Vexa fails to join?**  
-The orchestrator can fall back to Playwright browser automation (see [TODO.md](../TODO.md) Phase 5). That is separate from the email path.
+Playwright fallback (see [TODO.md](../TODO.md) Phase 5).
 
 **Is transcript / AI processing included?**  
-Not in v1. The [architecture diagram](architecture.md) shows a future path to CentralAgent Brain; that is out of scope for the first release per [PRD.md](../PRD.md).
+Not in v1 ([PRD.md](../PRD.md)).
 
 ---
 
 ## Related docs
 
-- [architecture.md](architecture.md) — System diagram
-- [PRD.md](../PRD.md) — Product requirements
-- [TODO.md](../TODO.md) — Implementation checklist
+- [architecture.md](architecture.md)
+- [PRD.md](../PRD.md)
+- [TODO.md](../TODO.md)
 - [Resend inbound email](https://resend.com/docs/dashboard/receiving/introduction)
 - [Vexa Bots API](https://docs.vexa.ai/api/bots)

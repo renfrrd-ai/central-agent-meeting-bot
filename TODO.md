@@ -68,23 +68,37 @@ Copy [`.env.example`](.env.example) to `.env` and fill in secrets. Document setu
 
 | Area | Choice | Notes |
 |------|--------|-------|
-| **Vexa** | **Cloud** (`https://api.cloud.vexa.ai`) | Fastest MVP for Easy Mode. Migrate to self-hosted before production if you need persistent browser auth or data on your infra. |
-| **Email** | **Resend** webhooks | Inbound invites to `bot@centralagent.ai` ([architecture](docs/architecture.md)). |
+| **Vexa** | **Cloud** (`https://api.cloud.vexa.ai`) | Required for bot joins. |
+| **Email** | **Resend webhooks** | `RESEND_API_KEY` + `RESEND_WEBHOOK_SECRET` + public HTTPS URL for `/webhooks/resend`. |
 | **First platform** | **Google Meet** | Prove join flow before Teams/Zoom. |
+
+### Minimum env by mode
+
+```bash
+# Easy Mode
+VEXA_API_KEY=...
+API_KEY=...
+
+# Advanced Mode (webhook)
+RESEND_API_KEY=...
+RESEND_WEBHOOK_SECRET=whsec_...
+BOT_EMAIL=you@your-id.resend.app
+INVITE_SENDER_MODE=open
+```
 
 ### Vexa (cloud → self-hosted later)
 
 - [x] Vexa deployment model: **Cloud** for dev/MVP
 - [ ] Copy `.env.example` → `.env`; set `VEXA_API_KEY` from [vexa.ai/account](https://vexa.ai/account) (never commit real keys)
 - [ ] Confirm bot joins a Google Meet via cloud Vexa
-- [ ] *(Later)* Switch `VEXA_API_BASE` to self-hosted URL when moving to production — see [Self-Hosted Quickstart](https://docs.vexa.ai/getting-started)
+- [ ] *(Later)* Switch `VEXA_API_BASE` to self-hosted URL — see [Self-Hosted Quickstart](https://docs.vexa.ai/getting-started)
 
 ### Inbound email (Resend)
 
 - [x] Email provider: **Resend** (`email.received` webhook)
-- [ ] Configure MX for `centralagent.ai` (or your domain) per [Resend receiving](https://resend.com/docs/dashboard/receiving/introduction)
-- [ ] Set `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `ALLOWED_INVITE_SENDERS` in `.env`
-- [ ] Implement sender allowlist before processing any invite body
+- [ ] Copy receiving address from Resend dashboard → `BOT_EMAIL`
+- [ ] Set `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET` in `.env`
+- [ ] Register HTTPS webhook URL in Resend → `/webhooks/resend`
 
 ---
 
@@ -207,16 +221,20 @@ docs/
 **Blocked by:** Phase 3 (reuse same `orchestrator.join`)  
 **Acceptance:** Sending a calendar invite with a Meet link to the bot inbox results in automatic join without calling `/api/join`.
 
-### 4a — Resend email infrastructure
+### 4a — Resend webhook infrastructure
 
-- [ ] Configure receiving domain + MX records for `centralagent.ai` (or your domain)
+- [ ] Resend receiving address or custom domain MX
 - [ ] `POST /webhooks/resend` — verify signature with `RESEND_WEBHOOK_SECRET`
-- [ ] Handle `email.received` — fetch full message via Resend receiving API (`resend` SDK >= 6.9.2)
-- [ ] Dev tunnel (ngrok / Tailscale Funnel) documented in `docs/setup.md`
+- [ ] Handle `email.received` — fetch body via `resend.emails.receiving.get()` (`RESEND_API_KEY`)
+- [ ] Register public HTTPS URL in Resend (tunnel for local dev)
 
 ### 4b — Security (required)
 
-- [ ] Sender allowlist env (`ALLOWED_INVITE_SENDERS=email@company.com,...`)
+- [ ] `src/email/sender-allowlist.ts` — `isSenderAllowed(from)` using env:
+  - [ ] `INVITE_SENDER_MODE=strict` — only `ALLOWED_INVITE_SENDERS` (exact match)
+  - [ ] `INVITE_SENDER_MODE=domain` — any `@ALLOWED_INVITE_DOMAINS` + `ALLOWED_INVITE_SENDERS`
+  - [ ] `INVITE_SENDER_MODE=open` — allow all (log warning; dev only)
+- [ ] Parse `From` header formats (`user@domain.com`, `Name <user@domain.com>`)
 - [ ] Reject auto-replies (`Auto-Submitted`, `X-Auto-Response-Suppress`)
 - [ ] Rate limit joins per sender / per hour
 - [ ] Never treat email body as instructions — only extract meeting links
@@ -314,11 +332,11 @@ docs/
 ## Phase 9 — Deployment and operations
 
 **Blocked by:** Phases 0–7 stable locally  
-**Acceptance:** Service deployable with env vars; production webhook HTTPS; runbook covers top failures.
+**Acceptance:** Service deployable with env vars; HTTPS webhook URL registered in Resend; runbook covers top failures.
 
 - [ ] `Dockerfile` — multi-stage build, run as non-root
 - [ ] Optional `docker-compose.yml` — orchestrator + note linking to external Vexa stack
-- [ ] Production env checklist:
+- [ ] Deploy env checklist:
   - [ ] `PORT` bound correctly (Render/web services expect `$PORT`)
   - [ ] Secrets in platform vault (not `.env` in image)
   - [ ] HTTPS URL for email webhooks
@@ -394,6 +412,6 @@ Do not implement these until PRD / stakeholders expand scope:
 3. Phase **4** — Advanced Mode via **Resend** → `bot@centralagent.ai`
 4. Phase **5** — Playwright fallback when Vexa join fails
 5. Phases **7 → 8 → 9 → 10** — harden, deploy, document
-6. *(Later)* Self-hosted Vexa + Path A auth when moving to production
+6. *(Later)* Self-hosted Vexa + Path A auth if needed
 
 Track progress by checking boxes above. When a phase is complete, note the date and environment (local / staging / prod) in your team’s workflow or changelog.
