@@ -4,7 +4,6 @@ import { loadEnv, resetEnvCache } from "../../src/config/env.js";
 import type { JoinOrchestrator } from "../../src/orchestrator/join.js";
 
 const testEnv = loadEnv({
-  API_KEY: "test-api-key",
   VEXA_API_KEY: "test-vexa-key",
   VEXA_API_BASE: "https://api.cloud.vexa.ai",
 });
@@ -41,15 +40,6 @@ describe("POST /api/join", () => {
     await app.close();
   });
 
-  it("returns 401 without API key", async () => {
-    const response = await app.inject({
-      method: "POST",
-      url: "/api/join",
-      payload: { meetingUrl: "https://meet.google.com/abc-defg-hij" },
-    });
-    expect(response.statusCode).toBe(401);
-  });
-
   it("joins Google Meet from URL", async () => {
     mockJoin.mockResolvedValueOnce({
       success: true,
@@ -66,7 +56,6 @@ describe("POST /api/join", () => {
     const response = await app.inject({
       method: "POST",
       url: "/api/join",
-      headers: { "x-api-key": "test-api-key" },
       payload: { meetingUrl: "https://meet.google.com/abc-defg-hij" },
     });
 
@@ -92,7 +81,6 @@ describe("POST /api/join", () => {
     const response = await app.inject({
       method: "POST",
       url: "/api/join",
-      headers: { "x-api-key": "test-api-key" },
       payload: {
         meetingUrl: "https://teams.live.com/meet/1234567890123?p=xyz",
       },
@@ -116,7 +104,6 @@ describe("POST /api/join", () => {
     const response = await app.inject({
       method: "POST",
       url: "/api/join",
-      headers: { "x-api-key": "test-api-key" },
       payload: { meetingUrl: "https://zoom.us/j/12345678901" },
     });
 
@@ -128,7 +115,6 @@ describe("POST /api/join", () => {
     const response = await app.inject({
       method: "POST",
       url: "/api/join",
-      headers: { "x-api-key": "test-api-key" },
       payload: { meetingUrl: "https://example.com/nope" },
     });
 
@@ -140,7 +126,6 @@ describe("POST /api/join", () => {
     const response = await app.inject({
       method: "POST",
       url: "/api/join",
-      headers: { "x-api-key": "test-api-key" },
       payload: {
         meetingUrl: "https://teams.microsoft.com/l/meetup-join/foo/1234567890123",
       },

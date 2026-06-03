@@ -6,7 +6,6 @@ import { ParseError, parseMeetingUrl } from "../parsers/index.js";
 import type { MeetingRef, Platform } from "../parsers/types.js";
 import { VexaApiError } from "../vexa/types.js";
 import { validateMeetingRefForVexa } from "../vexa/validate.js";
-import { requireApiKey } from "./middleware/auth.js";
 import {
   joinBodySchema,
   leaveBodySchema,
@@ -45,13 +44,6 @@ export async function registerApiRoutes(
 ): Promise<void> {
   const orchestrator =
     options.orchestrator ?? new JoinOrchestrator(options);
-
-  app.addHook("onRequest", async (request, reply) => {
-    const path = request.url.split("?")[0] ?? request.url;
-    if (!path.startsWith("/api/")) return;
-    await requireApiKey(request, reply, options.env);
-    if (reply.sent) return;
-  });
 
   app.post("/api/join", async (request, reply) => {
     const parsed = joinBodySchema.safeParse(request.body);

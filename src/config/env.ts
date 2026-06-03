@@ -5,8 +5,6 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
-  API_KEY: z.string().min(1, "API_KEY is required"),
-
   VEXA_API_BASE: z.string().url().default("https://api.cloud.vexa.ai"),
   VEXA_API_KEY: z.string().min(1, "VEXA_API_KEY is required"),
 

@@ -8,7 +8,7 @@ Autonomous meeting bot orchestrator: joins **Google Meet**, **Microsoft Teams**,
 ## Quickstart
 
 ```bash
-cp .env.example .env   # set API_KEY and VEXA_API_KEY
+cp .env.example .env   # set VEXA_API_KEY
 npm install
 npm run dev
 curl http://localhost:3000/health
@@ -18,7 +18,6 @@ Join a meeting:
 
 ```bash
 curl -X POST http://localhost:3000/api/join \
-  -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"meetingUrl":"https://meet.google.com/abc-defg-hij"}'
 ```

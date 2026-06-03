@@ -12,7 +12,7 @@ See [bot-email-and-deployment.md](./bot-email-and-deployment.md) for email and h
 
 ```bash
 cp .env.example .env
-# Set API_KEY, VEXA_API_KEY (and optional BOT_* vars)
+# Set VEXA_API_KEY (and optional BOT_* vars)
 
 npm install
 npm run dev
@@ -26,13 +26,12 @@ curl http://localhost:3000/health
 
 ## Easy Mode UI
 
-Open **http://localhost:3000** in your browser. Enter the same `API_KEY` from `.env`, paste a meeting URL, and click **Join meeting**.
+Open **http://localhost:3000** in your browser, paste a meeting URL, and click **Join meeting**.
 
 ## Easy Mode — join a meeting (curl)
 
 ```bash
 curl -X POST http://localhost:3000/api/join \
-  -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"meetingUrl":"https://meet.google.com/abc-defg-hij"}'
 ```
@@ -49,12 +48,10 @@ Supported URL formats ([Vexa meeting IDs](https://docs.vexa.ai/meeting-ids)):
 
 ```bash
 # Status
-curl http://localhost:3000/api/status/google_meet/abc-defg-hij \
-  -H "X-API-Key: YOUR_API_KEY"
+curl http://localhost:3000/api/status/google_meet/abc-defg-hij
 
 # Leave
 curl -X POST http://localhost:3000/api/leave \
-  -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"meetingUrl":"https://meet.google.com/abc-defg-hij"}'
 ```
