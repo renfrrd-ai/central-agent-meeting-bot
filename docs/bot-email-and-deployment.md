@@ -199,7 +199,9 @@ Never commit real secrets to git. `.env` is gitignored.
 
 ## How Render fits in
 
-[Render](https://render.com) hosts the orchestrator with a stable HTTPS URL:
+For local development, use **ngrok** (see [setup.md](./setup.md#ngrok-for-advanced-mode)) instead of a cloud host. [Render](https://render.com) is optional if you want a stable URL without keeping your laptop on.
+
+Example hosted URL (optional):
 
 ```text
 https://central-agent-meeting-bot.onrender.com

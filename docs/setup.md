@@ -75,6 +75,34 @@ curl -X POST http://localhost:3000/api/leave \
   -d '{"meetingUrl":"https://meet.google.com/abc-defg-hij"}'
 ```
 
+## ngrok for Advanced Mode
+
+**Easy Mode** (paste a Meet URL in the UI) works on `localhost` only — no tunnel needed.
+
+**Advanced Mode** (invite `BOT_EMAIL`, Resend webhook auto-join) needs a **public HTTPS** URL because Resend cannot POST to `localhost`.
+
+### Quick start
+
+1. Run the app: `npm run dev` (listens on port 3000).
+2. In another terminal: `ngrok http 3000`
+3. Copy the **HTTPS** URL, e.g. `https://abc123.ngrok-free.app`
+4. In [Resend](https://resend.com) → Webhooks, set:
+   ```text
+   https://abc123.ngrok-free.app/webhooks/resend
+   ```
+5. Keep **both** terminals running while you demo.
+
+### Notes
+
+| Topic | Detail |
+|-------|--------|
+| **Free ngrok** | URL changes every time you restart ngrok — update the Resend webhook URL |
+| **Browser warning** | ngrok’s interstitial is for browsers only; Resend’s server POST is unaffected |
+| **Trainer demo** | Share your ngrok URL while the tunnel is up, or use **Easy Mode** so they only need the UI |
+| **Env vars** | Same as `.env` locally — ngrok does not need extra keys |
+
+Phase 4 must implement `POST /webhooks/resend` before the webhook does anything; until then use Easy Mode.
+
 ## Tests
 
 ```bash

@@ -24,8 +24,8 @@ curl -X POST http://localhost:3000/api/join \
 
 ## Docs
 
-- [Setup guide](docs/setup.md)
-- [How bot email, Resend, and Render work](docs/bot-email-and-deployment.md)
+- [Setup guide](docs/setup.md) (includes ngrok for webhooks)
+- [How bot email and Resend work](docs/bot-email-and-deployment.md)
 - [Architecture diagram](docs/architecture.md)
 - [Implementation TODO](TODO.md)
 - [Product requirements](PRD.md)
