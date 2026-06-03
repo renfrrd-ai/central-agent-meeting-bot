@@ -17,13 +17,6 @@ export function validateMeetingRefForVexa(meeting: MeetingRef): void {
     throw new ParseError("missing_meeting_id", "Google Meet meeting code is required");
   }
 
-  if (meeting.platform === "zoom" && !/^\d{9,11}$/.test(meeting.native_meeting_id)) {
-    throw new ParseError(
-      "invalid_meeting_id",
-      "Zoom native_meeting_id must be 9–11 digits",
-    );
-  }
-
   if (meeting.platform === "teams" && !/^\d{9,15}$/.test(meeting.native_meeting_id)) {
     throw new ParseError(
       "invalid_meeting_id",

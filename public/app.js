@@ -20,7 +20,6 @@ let lastLoggedStatus = null;
 const platformLabels = {
   google_meet: "Google Meet",
   teams: "Microsoft Teams",
-  zoom: "Zoom",
 };
 
 const statusLabels = {

@@ -1,4 +1,4 @@
-export type Platform = "google_meet" | "teams" | "zoom";
+export type Platform = "google_meet" | "teams";
 
 export interface MeetingRef {
   platform: Platform;

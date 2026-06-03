@@ -176,8 +176,8 @@ describe("JoinOrchestrator", () => {
     await expect(
       orchestrator.join({
         meetingRef: {
-          platform: "zoom",
-          native_meeting_id: "12345678901",
+          platform: "google_meet",
+          native_meeting_id: "abc-defg-hij",
         },
       }),
     ).rejects.toBeInstanceOf(VexaApiError);

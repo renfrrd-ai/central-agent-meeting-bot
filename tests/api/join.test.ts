@@ -90,25 +90,15 @@ describe("POST /api/join", () => {
     expect(response.json().data.meetingRef.platform).toBe("teams");
   });
 
-  it("joins Zoom from URL", async () => {
-    mockJoin.mockResolvedValueOnce({
-      success: true,
-      status: "joined",
-      correlationId: "corr-3",
-      meetingRef: {
-        platform: "zoom",
-        native_meeting_id: "12345678901",
-      },
-    });
-
+  it("returns 400 for Zoom URL (unsupported platform)", async () => {
     const response = await app.inject({
       method: "POST",
       url: "/api/join",
       payload: { meetingUrl: "https://zoom.us/j/12345678901" },
     });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json().data.meetingRef.platform).toBe("zoom");
+    expect(response.statusCode).toBe(400);
+    expect(response.json().success).toBe(false);
   });
 
   it("returns 400 for invalid meeting URL", async () => {

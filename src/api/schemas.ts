@@ -11,13 +11,13 @@ export const leaveBodySchema = z.union([
     meetingUrl: z.string().min(1),
   }),
   z.object({
-    platform: z.enum(["google_meet", "teams", "zoom"]),
+    platform: z.enum(["google_meet", "teams"]),
     nativeMeetingId: z.string().min(1),
     passcode: z.string().optional(),
   }),
 ]);
 
-export const platformParamSchema = z.enum(["google_meet", "teams", "zoom"]);
+export const platformParamSchema = z.enum(["google_meet", "teams"]);
 
 export type JoinBody = z.infer<typeof joinBodySchema>;
 export type LeaveBody = z.infer<typeof leaveBodySchema>;

@@ -100,37 +100,6 @@ function parseTeams(hostname: string, pathname: string, searchParams: URLSearchP
   );
 }
 
-function parseZoom(hostname: string, pathname: string, searchParams: URLSearchParams, sourceUrl: string): MeetingRef {
-  const host = hostname.toLowerCase();
-  const isZoomHost =
-    host.endsWith(".zoom.us") ||
-    host === "zoom.us" ||
-    host.endsWith(".zoomgov.com") ||
-    host === "zoomgov.com";
-
-  if (!isZoomHost) {
-    throw new ParseError("unsupported_host", `Unsupported Zoom host: ${hostname}`);
-  }
-
-  const joinMatch = pathname.match(/\/j\/(\d{9,11})/i);
-  const wcMatch = pathname.match(/\/wc\/(\d{9,11})/i);
-  const meetingId = joinMatch?.[1] ?? wcMatch?.[1];
-
-  if (!meetingId) {
-    throw new ParseError("missing_meeting_id", "Zoom URL is missing a meeting ID (/j/{id})");
-  }
-
-  const passcode =
-    searchParams.get("pwd") ?? searchParams.get("password") ?? undefined;
-
-  return {
-    platform: "zoom",
-    native_meeting_id: meetingId,
-    passcode: passcode ?? undefined,
-    sourceUrl,
-  };
-}
-
 function detectPlatform(hostname: string): Platform | null {
   const host = hostname.toLowerCase();
   if (host === "meet.google.com") return "google_meet";
@@ -142,14 +111,6 @@ function detectPlatform(hostname: string): Platform | null {
     host === "gov.teams.microsoft.us"
   ) {
     return "teams";
-  }
-  if (
-    host.endsWith(".zoom.us") ||
-    host === "zoom.us" ||
-    host.endsWith(".zoomgov.com") ||
-    host === "zoomgov.com"
-  ) {
-    return "zoom";
   }
   return null;
 }
@@ -170,8 +131,6 @@ export function parseMeetingUrl(input: string): MeetingRef {
       return parseGoogleMeet(url.hostname, url.pathname, url.toString());
     case "teams":
       return parseTeams(url.hostname, url.pathname, url.searchParams, url.toString());
-    case "zoom":
-      return parseZoom(url.hostname, url.pathname, url.searchParams, url.toString());
   }
 }
 

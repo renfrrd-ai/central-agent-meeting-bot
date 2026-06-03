@@ -46,26 +46,10 @@ describe("parseMeetingUrl", () => {
     });
   });
 
-  it("parses Zoom URL with password", () => {
-    expect(
-      parseMeetingUrl(
-        "https://us05web.zoom.us/j/12345678901?pwd=abc123secret",
-      ),
-    ).toEqual({
-      platform: "zoom",
-      native_meeting_id: "12345678901",
-      passcode: "abc123secret",
-      sourceUrl:
-        "https://us05web.zoom.us/j/12345678901?pwd=abc123secret",
-    });
-  });
-
-  it("parses Zoom URL without password", () => {
-    expect(parseMeetingUrl("https://zoom.us/j/98765432109")).toEqual({
-      platform: "zoom",
-      native_meeting_id: "98765432109",
-      sourceUrl: "https://zoom.us/j/98765432109",
-    });
+  it("rejects Zoom URLs (out of scope)", () => {
+    expect(() =>
+      parseMeetingUrl("https://zoom.us/j/12345678901"),
+    ).toThrow(ParseError);
   });
 
   it("rejects unsupported hosts", () => {
