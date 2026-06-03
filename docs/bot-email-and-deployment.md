@@ -41,7 +41,7 @@ Examples:
 | **Resend** | Receives inbound email and sends `email.received` webhooks |
 | **Orchestrator** (this app) | Handles webhooks, parses invites, calls Vexa |
 | **Render** (or any host) | Runs the orchestrator on a public HTTPS URL |
-| **Vexa Cloud** | Launches the meeting bot into Meet/Teams/Zoom |
+| **Vexa Cloud** | Launches the meeting bot into Meet or Teams |
 
 Render does **not** receive email. Resend receives mail, then POSTs to your orchestrator’s webhook endpoint.
 
@@ -91,7 +91,7 @@ sequenceDiagram
 
 ### Step by step
 
-1. Organizer invites `BOT_EMAIL` on a calendar event with a Meet/Teams/Zoom link.
+1. Organizer invites `BOT_EMAIL` on a calendar event with a Meet or Teams link.
 2. Mail is delivered to Resend (via `@xxx.resend.app` or custom domain MX).
 3. Resend POSTs an `email.received` event to `https://your-host/webhooks/resend`.
 4. Orchestrator verifies the webhook signature (`RESEND_WEBHOOK_SECRET`).

@@ -7,7 +7,7 @@ Actionable checklist to implement the system described in [PRD.md](PRD.md) and [
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **0** Foundation | Done | Fastify, TypeScript, Vitest, `GET /health`, env validation |
-| **1** Parsers | Done | Meet, Teams, Zoom URLs → `MeetingRef` + unit tests |
+| **1** Parsers | Done | Meet + Teams URLs → `MeetingRef` + unit tests (Zoom removed) |
 | **2** Vexa orchestrator | Done | `POST /bots`, poll until `active`, duplicate guard, `GET /meetings` lifecycle |
 | **3** Easy Mode API + UI | Done | `/api/join`, `/api/status`, `/api/leave`, local UI at `/` |
 | **4+** | Not started | Resend webhooks, Playwright fallback, production auth |
@@ -80,7 +80,7 @@ Copy [`.env.example`](.env.example) to `.env` and fill in secrets. Document setu
 |------|--------|-------|
 | **Vexa** | **Cloud** (`https://api.cloud.vexa.ai`) | Required for bot joins. |
 | **Email** | **Resend webhooks** | `RESEND_API_KEY` + `RESEND_WEBHOOK_SECRET` + public HTTPS URL for `/webhooks/resend`. |
-| **First platform** | **Google Meet** | Prove join flow before Teams/Zoom. |
+| **Platforms** | **Google Meet** + **Teams** | Meet = assignment; Teams = reliable on Vexa Cloud. Zoom out of scope. Meet issues: [Vexa #407](https://github.com/Vexa-ai/vexa/issues/407). |
 
 ### Minimum env by mode
 
@@ -163,22 +163,21 @@ docs/
 ## Phase 1 — Domain model and link parsing
 
 **Blocked by:** Phase 0  
-**Acceptance:** Parser unit tests pass for Meet, Teams, and Zoom fixture URLs; invalid URLs throw typed errors.  
+**Acceptance:** Parser unit tests pass for Meet and Teams fixture URLs; invalid URLs throw typed errors.  
 **Status:** Done (2026-06)
 
 - [x] Add `src/parsers/types.ts`:
-  - `Platform`: `google_meet` | `teams` | `zoom`
+  - `Platform`: `google_meet` | `teams`
   - `MeetingRef`: `{ platform, native_meeting_id, passcode?, sourceUrl? }`
   - `JoinRequest`, `JoinResult`, `BotLifecycleEvent` enums/types (+ `awaiting_admission` join status)
 - [x] Implement `parseMeetingUrl(url: string): MeetingRef` in `src/parsers/meeting-url.ts`
 - [x] **Google Meet:** `meet.google.com/{code}` → `google_meet` + hyphenated code ([Vexa Bots API — Meet](https://docs.vexa.ai/api/bots))
 - [x] **Microsoft Teams:** extract numeric meeting ID from URL; extract `?p=` as `passcode` when present
-- [x] **Zoom:** extract meeting ID and password (`pwd`) from join URL when present
 - [x] Reject unknown hosts, empty IDs, and malformed URLs with `ParseError` (include `code` + `message`)
+- [x] Reject Zoom URLs (out of project scope)
 - [x] Add `tests/parsers/meeting-url.test.ts` with fixtures:
   - [x] Valid Meet URL
   - [x] Valid Teams URL with passcode
-  - [x] Valid Zoom URL with password
   - [x] Invalid / unsupported URL
 - [x] Export parser from `src/parsers/index.ts`
 
@@ -276,7 +275,7 @@ docs/
 - [ ] `src/playwright/session.ts` — load/save `storageState` per platform account
 - [ ] `src/playwright/join-google-meet.ts` — open URL, name prompt, waiting room / ask to join
 - [ ] `src/playwright/join-teams.ts` — Teams web join flow (if in v1 scope; else document as Phase 5b)
-- [ ] `src/playwright/join-zoom.ts` — Zoom web client (if in v1 scope; else document as Phase 5b)
+- [x] Zoom — removed from scope (not required by assignment)
 - [ ] Wire fallback in `orchestrator.join` only when `FALLBACK_ENABLED=true` and error matches retriable matrix
 - [ ] Capture screenshot on failure to `logs/screenshots/`
 - [ ] Document retriable vs fatal errors in [docs/runbook.md](docs/runbook.md)
@@ -400,7 +399,7 @@ Do not implement these until PRD / stakeholders expand scope:
 
 | PRD criterion | Source | Verification |
 |---------------|--------|--------------|
-| Successful joins from URL triggers | [PRD Success Criteria](PRD.md#success-criteria) | `POST /api/join` with real Meet/Teams/Zoom URL; bot appears in meeting |
+| Successful joins from URL triggers | [PRD Success Criteria](PRD.md#success-criteria) | `POST /api/join` with real Meet or Teams URL; bot appears in meeting |
 | Successful joins from email invites | [PRD Success Criteria](PRD.md#success-criteria) | Organizer invites `BOT_EMAIL`; bot joins without manual `/api/join` |
 | No repeated manual login | [PRD Goals](PRD.md#goals) | Restart orchestrator (+ Vexa/Playwright); join authenticated meeting without interactive login |
 | Reliable event detection | [PRD Success Criteria](PRD.md#success-criteria) | Webhook delivered once; dedup prevents double join; logs show `trigger_received` |
