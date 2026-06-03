@@ -5,9 +5,9 @@ import { meetingRefKey, type MeetingRef } from "../parsers/index.js";
 import type { JoinResult, JoinStatus } from "../parsers/types.js";
 import { VexaClient } from "../vexa/client.js";
 import {
-  isVexaBotRunning,
   isVexaMeetingAccepted,
-  mapVexaBotStatus,
+  isVexaMeetingActive,
+  resolveJoinStatus,
 } from "../vexa/status.js";
 import { VexaApiError } from "../vexa/types.js";
 
@@ -135,10 +135,13 @@ export class JoinOrchestrator {
   }
 
   async getStatus(meetingRef: MeetingRef): Promise<JoinStatus> {
-    const running = await this.vexa.listRunningBots();
+    const [running, meeting] = await Promise.all([
+      this.vexa.listRunningBots(),
+      this.vexa.findMeeting(meetingRef),
+    ]);
     const bot = this.vexa.findRunningBot(running, meetingRef);
-    if (!bot) return "stopped";
-    return mapVexaBotStatus(bot.normalized_status, bot.status);
+    if (!bot && !meeting) return "stopped";
+    return resolveJoinStatus({ bot, meeting });
   }
 
   async leave(meetingRef: MeetingRef): Promise<void> {
@@ -146,8 +149,8 @@ export class JoinOrchestrator {
   }
 
   /**
-   * Poll GET /bots/status until normalized_status is "Up" or timeout.
-   * @see https://docs.vexa.ai/api/bots#get-botsstatus
+   * Poll container + meeting lifecycle until `active` or timeout.
+   * @see https://docs.vexa.ai/concepts
    */
   private async waitForBot(
     meetingRef: MeetingRef,
@@ -160,21 +163,25 @@ export class JoinOrchestrator {
       : "requested";
 
     while (Date.now() < deadline) {
-      const running = await this.vexa.listRunningBots();
+      const [running, meeting] = await Promise.all([
+        this.vexa.listRunningBots(),
+        this.vexa.findMeeting(meetingRef),
+      ]);
       const bot = this.vexa.findRunningBot(running, meetingRef);
 
-      if (bot) {
-        lastStatus = mapVexaBotStatus(bot.normalized_status, bot.status);
+      if (bot || meeting) {
+        lastStatus = resolveJoinStatus({ bot, meeting });
         logLifecycle(this.logger, "vexa_status", {
           correlationId,
           platform: meetingRef.platform,
           native_meeting_id: meetingRef.native_meeting_id,
           status: lastStatus,
-          normalizedStatus: bot.normalized_status,
-          rawStatus: bot.status,
+          meetingStatus: meeting?.status,
+          normalizedStatus: bot?.normalized_status,
+          rawStatus: bot?.status,
         });
 
-        if (isVexaBotRunning(bot.normalized_status, bot.status)) {
+        if (isVexaMeetingActive(meeting?.status)) {
           return "joined";
         }
 

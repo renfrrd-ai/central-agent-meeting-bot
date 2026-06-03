@@ -47,6 +47,10 @@ export interface VexaRunningBotsResponse {
   running_bots: VexaRunningBot[];
 }
 
+export interface VexaMeetingsListResponse {
+  meetings: VexaMeetingRecord[];
+}
+
 /** DELETE /bots 202 response */
 export interface VexaStopBotResponse {
   message?: string;

@@ -17,6 +17,7 @@ export interface JoinRequest {
 export type JoinStatus =
   | "requested"
   | "running"
+  | "awaiting_admission"
   | "joined"
   | "failed"
   | "duplicate"

@@ -6,6 +6,7 @@ import {
   type VexaCreateBotRequest,
   type VexaMeetingRecord,
   type VexaRunningBot,
+  type VexaMeetingsListResponse,
   type VexaRunningBotsResponse,
   type VexaStopBotResponse,
 } from "./types.js";
@@ -118,6 +119,33 @@ export class VexaClient {
       "/bots/status",
     );
     return data.running_bots ?? [];
+  }
+
+  async listMeetings(limit = 100, offset = 0): Promise<VexaMeetingRecord[]> {
+    const data = await this.request<VexaMeetingsListResponse>(
+      "GET",
+      `/meetings?limit=${limit}&offset=${offset}`,
+    );
+    return data.meetings ?? [];
+  }
+
+  /** Latest in-progress meeting row for this ref, if any. */
+  async findMeeting(meeting: MeetingRef): Promise<VexaMeetingRecord | undefined> {
+    const meetings = await this.listMeetings();
+    const matches = meetings.filter(
+      (m) =>
+        m.platform === meeting.platform &&
+        m.native_meeting_id === meeting.native_meeting_id,
+    );
+    if (matches.length === 0) return undefined;
+
+    const terminal = new Set(["completed", "failed"]);
+    const inProgress = matches.filter(
+      (m) => !terminal.has((m.status ?? "").toLowerCase()),
+    );
+    const pool = inProgress.length > 0 ? inProgress : matches;
+
+    return pool.sort((a, b) => (b.id ?? 0) - (a.id ?? 0))[0];
   }
 
   async stopBot(meeting: MeetingRef): Promise<VexaStopBotResponse> {
