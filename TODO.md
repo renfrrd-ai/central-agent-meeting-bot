@@ -2,7 +2,17 @@
 
 Actionable checklist to implement the system described in [PRD.md](PRD.md) and [docs/architecture.md](docs/architecture.md).
 
-**Repository status:** Greenfield — no application code yet. This document is the implementation roadmap.
+**Repository status:** Phases **0–3** implemented (Easy Mode + Vexa Cloud). Advanced Mode (Phase 4), Playwright fallback (Phase 5), and deployment hardening remain.
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| **0** Foundation | Done | Fastify, TypeScript, Vitest, `GET /health`, env validation |
+| **1** Parsers | Done | Meet, Teams, Zoom URLs → `MeetingRef` + unit tests |
+| **2** Vexa orchestrator | Done | `POST /bots`, poll until `active`, duplicate guard, `GET /meetings` lifecycle |
+| **3** Easy Mode API + UI | Done | `/api/join`, `/api/status`, `/api/leave`, local UI at `/` |
+| **4+** | Not started | Resend webhooks, Playwright fallback, production auth |
+
+**Verified locally:** `npm test` (28 tests), `npm run build`, `npm run dev` → http://localhost:3000
 
 ---
 
@@ -75,9 +85,8 @@ Copy [`.env.example`](.env.example) to `.env` and fill in secrets. Document setu
 ### Minimum env by mode
 
 ```bash
-# Easy Mode
+# Easy Mode (minimum)
 VEXA_API_KEY=...
-API_KEY=...
 
 # Advanced Mode (webhook)
 RESEND_API_KEY=...
@@ -131,88 +140,95 @@ docs/
 ## Phase 0 — Project foundation
 
 **Blocked by:** nothing  
-**Acceptance:** `npm run build`, `npm test`, `npm run dev` start; `GET /health` returns 200.
+**Acceptance:** `npm run build`, `npm test`, `npm run dev` start; `GET /health` returns 200.  
+**Status:** Done (2026-06)
 
-- [ ] Initialize `package.json` with name, engines (Node 20+), `"type": "module"` if using ESM
-- [ ] Add TypeScript (`tsconfig.json`): strict mode, `src/` → `dist/`
-- [ ] Add dev tooling: ESLint, Prettier (optional), Vitest
-- [ ] Scripts: `dev`, `build`, `start`, `test`, `typecheck`, `lint`
-- [ ] Create `src/index.ts` — bootstrap Fastify server on `PORT` (default `3000`)
-- [ ] Implement `GET /health` → `{ "status": "ok" }`
-- [ ] Add `src/config/env.ts` — validate required env with Zod; fail fast on boot
+- [x] Initialize `package.json` with name, engines (Node 20+), `"type": "module"` if using ESM
+- [x] Add TypeScript (`tsconfig.json`): strict mode, `src/` → `dist/`
+- [x] Add dev tooling: ESLint, Vitest
+- [x] Scripts: `dev`, `build`, `start`, `test`, `typecheck`, `lint`
+- [x] Create `src/index.ts` — bootstrap Fastify server on `PORT` (default `3000`)
+- [x] Implement `GET /health` → `{ "status": "ok" }`
+- [x] Add `src/config/env.ts` — validate required env with Zod; fail fast on boot
 - [x] Create [`.env.example`](.env.example) (Vexa Cloud + Resend defaults — see **Chosen stack** above)
-- [ ] Copy `.env.example` → `.env` and fill in secrets locally
+- [ ] Copy `.env.example` → `.env` and fill in secrets locally *(operator task)*
 
-- [ ] Add `data/` and `logs/` to `.gitignore` if not already covered
+- [x] Add `data/` and `logs/` to `.gitignore` if not already covered
 - [x] [docs/bot-email-and-deployment.md](docs/bot-email-and-deployment.md) — bot email, Resend, Render (plain-language guide)
-- [ ] Stub [docs/setup.md](docs/setup.md) — step-by-step setup (link to bot-email doc for concepts)
-- [ ] Update [README.md](README.md) with one-paragraph overview + link to this TODO and `docs/setup.md`
+- [x] [docs/setup.md](docs/setup.md) — step-by-step setup (link to bot-email doc for concepts)
+- [x] Update [README.md](README.md) with one-paragraph overview + link to this TODO and `docs/setup.md`
 
 ---
 
 ## Phase 1 — Domain model and link parsing
 
 **Blocked by:** Phase 0  
-**Acceptance:** Parser unit tests pass for Meet, Teams, and Zoom fixture URLs; invalid URLs throw typed errors.
+**Acceptance:** Parser unit tests pass for Meet, Teams, and Zoom fixture URLs; invalid URLs throw typed errors.  
+**Status:** Done (2026-06)
 
-- [ ] Add `src/parsers/types.ts`:
+- [x] Add `src/parsers/types.ts`:
   - `Platform`: `google_meet` | `teams` | `zoom`
   - `MeetingRef`: `{ platform, native_meeting_id, passcode?, sourceUrl? }`
-  - `JoinRequest`, `JoinResult`, `BotLifecycleEvent` enums/types
-- [ ] Implement `parseMeetingUrl(url: string): MeetingRef` in `src/parsers/meeting-url.ts`
-- [ ] **Google Meet:** `meet.google.com/{code}` → `google_meet` + hyphenated code ([Vexa Bots API — Meet](https://docs.vexa.ai/api/bots))
-- [ ] **Microsoft Teams:** extract numeric meeting ID from URL; extract `?p=` as `passcode` when present
-- [ ] **Zoom:** extract meeting ID and password (`pwd`) from join URL when present
-- [ ] Reject unknown hosts, empty IDs, and malformed URLs with `ParseError` (include `code` + `message`)
-- [ ] Add `tests/parsers/meeting-url.test.ts` with fixtures:
-  - [ ] Valid Meet URL
-  - [ ] Valid Teams URL with passcode
-  - [ ] Valid Zoom URL with password
-  - [ ] Invalid / unsupported URL
-- [ ] Export parser from `src/parsers/index.ts`
+  - `JoinRequest`, `JoinResult`, `BotLifecycleEvent` enums/types (+ `awaiting_admission` join status)
+- [x] Implement `parseMeetingUrl(url: string): MeetingRef` in `src/parsers/meeting-url.ts`
+- [x] **Google Meet:** `meet.google.com/{code}` → `google_meet` + hyphenated code ([Vexa Bots API — Meet](https://docs.vexa.ai/api/bots))
+- [x] **Microsoft Teams:** extract numeric meeting ID from URL; extract `?p=` as `passcode` when present
+- [x] **Zoom:** extract meeting ID and password (`pwd`) from join URL when present
+- [x] Reject unknown hosts, empty IDs, and malformed URLs with `ParseError` (include `code` + `message`)
+- [x] Add `tests/parsers/meeting-url.test.ts` with fixtures:
+  - [x] Valid Meet URL
+  - [x] Valid Teams URL with passcode
+  - [x] Valid Zoom URL with password
+  - [x] Invalid / unsupported URL
+- [x] Export parser from `src/parsers/index.ts`
 
 ---
 
 ## Phase 2 — Vexa orchestrator (primary path)
 
 **Blocked by:** Phase 1  
-**Acceptance:** Given a `MeetingRef`, service calls Vexa `POST /bots` and can report running status; duplicate join for same meeting is prevented while bot is active.
+**Acceptance:** Given a `MeetingRef`, service calls Vexa `POST /bots` and can report running status; duplicate join for same meeting is prevented while bot is active.  
+**Status:** Done (2026-06) — uses **Vexa Cloud**; meeting lifecycle from `GET /meetings` (`active`, `awaiting_admission`, …), not container `Up` alone.
 
-- [ ] Add `src/vexa/types.ts` — request/response shapes aligned with [Bots API](https://docs.vexa.ai/api/bots)
-- [ ] Implement `src/vexa/client.ts`:
-  - [ ] `createBot(meeting: MeetingRef, options?)` → `POST /bots` with `X-API-Key`
-  - [ ] `listRunningBots()` → `GET /bots/status`
-  - [ ] `stopBot(meeting: MeetingRef)` → `DELETE /bots/{platform}/{native_meeting_id}`
-- [ ] Map `MeetingRef` → Vexa body:
-  - [ ] `platform`, `native_meeting_id`, optional `passcode`
-  - [ ] v1 defaults: `transcribe_enabled: false`, `recording_enabled` from env (PRD non-goals: no AI summaries in v1)
-  - [ ] Optional `bot_name` from `BOT_DISPLAY_NAME`
-- [ ] Implement `src/orchestrator/join.ts`:
-  - [ ] Check running bots — skip duplicate `platform` + `native_meeting_id` unless `force` flag
-  - [ ] Call `VexaClient.createBot`
-  - [ ] Poll status until terminal state or timeout (document interval/timeout in `docs/runbook.md`)
-- [ ] Error taxonomy + logging hooks: `vexa_4xx`, `vexa_5xx`, `timeout`, `duplicate_bot`
-- [ ] Add integration tests with HTTP mock (MSW or nock) for happy path + Vexa error
-- [ ] Manual smoke script or doc step: join a real Meet with **Vexa Cloud**
+- [x] Add `src/vexa/types.ts` — request/response shapes aligned with [Bots API](https://docs.vexa.ai/api/bots)
+- [x] Implement `src/vexa/client.ts`:
+  - [x] `createBot(meeting: MeetingRef, options?)` → `POST /bots` with `X-API-Key`
+  - [x] `listRunningBots()` → `GET /bots/status`
+  - [x] `stopBot(meeting: MeetingRef)` → `DELETE /bots/{platform}/{native_meeting_id}`
+  - [x] `findMeeting(meeting)` → `GET /meetings` (lifecycle status)
+- [x] Map `MeetingRef` → Vexa body:
+  - [x] `platform`, `native_meeting_id`, optional `passcode`
+  - [x] v1 defaults: `transcribe_enabled: false`, `recording_enabled` from env (PRD non-goals: no AI summaries in v1)
+  - [x] Optional `bot_name` from `BOT_DISPLAY_NAME`
+- [x] Implement `src/orchestrator/join.ts`:
+  - [x] Check running bots — skip duplicate `platform` + `native_meeting_id` unless `force` flag
+  - [x] Call `VexaClient.createBot`
+  - [x] Poll until meeting `active` or timeout (`VEXA_JOIN_POLL_INTERVAL_MS`, `VEXA_JOIN_TIMEOUT_MS` in `.env.example`)
+- [x] `src/vexa/status.ts` — `resolveJoinStatus`, `mapVexaMeetingStatus`, container vs lifecycle mapping
+- [x] Error taxonomy + logging hooks: `vexa_4xx`, lifecycle events via `src/logging/logger.ts`
+- [x] Integration tests with mocked `fetch` (orchestrator + API)
+- [ ] Manual smoke: join a real **Google Meet** with **Vexa Cloud** *(operator checklist)*
 
 ---
 
 ## Phase 3 — Easy Mode API
 
 **Blocked by:** Phase 2  
-**Acceptance:** `curl -X POST localhost:3000/api/join -H "X-API-Key: ..." -d '{"meetingUrl":"..."}'` triggers bot join; unauthorized requests rejected.
+**Acceptance:** `POST /api/join` with a meeting URL triggers bot join; status/leave endpoints work; local UI at `/` for dev.  
+**Status:** Done (2026-06) — API key auth **deferred** until Render deploy (local dev open).
 
-- [ ] Add API key middleware (`X-API-Key` or `Authorization: Bearer`) using `API_KEY` env
-- [ ] `POST /api/join`
-  - [ ] Body: `{ meetingUrl: string, botName?: string, force?: boolean }`
-  - [ ] Validate with Zod
-  - [ ] Flow: parse URL → `orchestrator.join` → response `{ success, meetingRef, status, correlationId }`
-- [ ] `GET /api/status/:platform/:nativeMeetingId` — proxy Vexa/running state
-- [ ] `POST /api/leave` — body with `meetingUrl` or platform + id → `stopBot`
-- [ ] Consistent error responses: `{ success: false, error: { code, message } }`
-- [ ] Register routes in `src/api/routes.ts`
-- [ ] Add `tests/api/join.test.ts` (mock orchestrator)
-- [ ] Document Easy Mode in `docs/setup.md` with example `curl` commands
+- [ ] Add API key middleware (`API_KEY` env) — *deferred for production; see Phase 9*
+- [x] `POST /api/join`
+  - [x] Body: `{ meetingUrl: string, botName?: string, force?: boolean }`
+  - [x] Validate with Zod
+  - [x] Flow: parse URL → `orchestrator.join` → response `{ success, meetingRef, status, correlationId }`
+- [x] `GET /api/status/:platform/:nativeMeetingId` — meeting lifecycle + container state
+- [x] `POST /api/leave` — body with `meetingUrl` or platform + id → `stopBot`
+- [x] Consistent error responses: `{ success: false, error: { code, message } }`
+- [x] Register routes in `src/api/routes.ts`; static UI via `public/` + `@fastify/static`
+- [x] Easy Mode UI at `http://localhost:3000` — join form, auto status poll, leave
+- [x] Add `tests/api/join.test.ts` + `tests/ui.test.ts` (mock orchestrator)
+- [x] Document Easy Mode in [docs/setup.md](docs/setup.md) with `curl` + UI steps
 
 ---
 
@@ -296,16 +312,16 @@ docs/
 **Blocked by:** Phase 3 (minimum); extend through Phases 4–5  
 **Acceptance:** Every join attempt has a correlation ID traceable through logs; SIGTERM attempts graceful bot stop.
 
-- [ ] `src/logging/logger.ts` — structured JSON (pino or equivalent)
-- [ ] Lifecycle events (include `correlationId`, `platform`, `native_meeting_id`):
-  - [ ] `trigger_received` (`source`: `api` | `email`)
-  - [ ] `link_parsed`
-  - [ ] `vexa_bot_requested`
-  - [ ] `vexa_status`
+- [x] `src/logging/logger.ts` — structured JSON (pino)
+- [x] Lifecycle events (include `correlationId`, `platform`, `native_meeting_id`):
+  - [x] `trigger_received` (`source`: `api` | `email`)
+  - [x] `link_parsed`
+  - [x] `vexa_bot_requested`
+  - [x] `vexa_status`
   - [ ] `fallback_started`
-  - [ ] `join_succeeded`
-  - [ ] `join_failed`
-- [ ] Propagate correlation ID from API body header `X-Correlation-Id` or generate UUID
+  - [x] `join_succeeded`
+  - [x] `join_failed`
+- [x] Propagate correlation ID from API header `X-Correlation-Id` or generate UUID
 - [ ] `SIGTERM` / `SIGINT` handler — call `stopBot` for active sessions where possible
 - [ ] Optional: simple counters in logs for joins succeeded/failed (no dashboard in v1)
 
@@ -316,9 +332,10 @@ docs/
 **Blocked by:** Phases 1–3 minimum  
 **Acceptance:** CI runs lint + test on every PR; coverage on parsers and orchestrator core.
 
-- [ ] Unit tests: parsers, invite extractor, env config
-- [ ] Integration: orchestrator + mocked Vexa HTTP
-- [ ] API route tests with injected mocks
+- [x] Unit tests: parsers, env config
+- [x] Integration: orchestrator + mocked Vexa HTTP
+- [x] API route tests with injected mocks
+- [ ] Unit tests: invite extractor *(Phase 4)*
 - [ ] Add GitHub Actions (or equivalent) workflow: `lint`, `typecheck`, `test`
 - [ ] E2E manual checklist (document only, not necessarily automated):
   - [ ] Easy Mode: Meet URL join
@@ -407,7 +424,7 @@ Do not implement these until PRD / stakeholders expand scope:
 
 ## Suggested implementation order
 
-1. Phases **0 → 1 → 2 → 3** — Easy Mode with **Vexa Cloud** (Google Meet first)
+1. ~~Phases **0 → 1 → 2 → 3** — Easy Mode with **Vexa Cloud** (Google Meet first)~~ **Done**
 2. Phase **6 Path B** — Playwright sessions if joins require login on cloud
 3. Phase **4** — Advanced Mode via **Resend** → `bot@centralagent.ai`
 4. Phase **5** — Playwright fallback when Vexa join fails
