@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meeting Bot — Easy Mode</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <div class="header-badge">Easy Mode</div>
+        <h1>Send the bot to a meeting</h1>
+        <p>
+          Paste a Google Meet, Teams, or Zoom link. The orchestrator calls Vexa
+          Cloud to join on your behalf.
+        </p>
+      </header>
+
+      <div id="alert" class="alert" role="alert"></div>
+
+      <section class="card">
+        <h2 class="card-title">Connection</h2>
+        <div class="field">
+          <label for="apiKey">API key <span class="hint">(from your .env)</span></label>
+          <input
+            type="password"
+            id="apiKey"
+            name="apiKey"
+            placeholder="Same value as API_KEY"
+            autocomplete="off"
+          />
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">Join meeting</h2>
+        <form id="joinForm">
+          <div class="field">
+            <label for="meetingUrl">Meeting URL</label>
+            <input
+              type="url"
+              id="meetingUrl"
+              name="meetingUrl"
+              placeholder="https://meet.google.com/abc-defg-hij"
+              required
+            />
+            <div class="platform-tags">
+              <span class="tag">Google Meet</span>
+              <span class="tag">Microsoft Teams</span>
+              <span class="tag">Zoom</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="botName">Bot display name <span class="hint">(optional)</span></label>
+            <input
+              type="text"
+              id="botName"
+              name="botName"
+              placeholder="Central Agent Bot"
+            />
+          </div>
+          <div class="field">
+            <label class="checkbox-row">
+              <input type="checkbox" id="force" name="force" />
+              <span>Force join even if a bot is already running for this meeting</span>
+            </label>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-primary" id="joinBtn">
+              Join meeting
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card session-panel" id="sessionPanel">
+        <h2 class="card-title">Active session</h2>
+        <div class="status-grid" id="statusGrid"></div>
+        <div class="actions">
+          <button type="button" class="btn btn-secondary" id="refreshBtn">
+            Refresh status
+          </button>
+          <button type="button" class="btn btn-danger" id="leaveBtn">
+            Leave meeting
+          </button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">Activity log</h2>
+        <div class="log" id="log"></div>
+      </section>
+
+      <p class="footer-note">
+        Local dev · API at <code>/api/join</code> · Health at <code>/health</code>
+      </p>
+    </main>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
