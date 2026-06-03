@@ -12,7 +12,7 @@ const testEnv = loadEnv({
   RESEND_WEBHOOK_SECRET: "whsec_test",
 });
 
-describe("POST /webhooks/resend", () => {
+describe("POST /webhooks/resend (configured)", () => {
   const mockProcessEvent = vi.fn().mockResolvedValue(undefined);
   const processor = {
     processEvent: mockProcessEvent,
@@ -114,5 +114,35 @@ describe("POST /webhooks/resend", () => {
     expect(response.json()).toEqual({ success: true, ignored: true });
     expect(mockProcessEvent).not.toHaveBeenCalled();
     await ignoreApp.close();
+  });
+});
+
+describe("POST /webhooks/resend (not configured)", () => {
+  it("returns 503 instead of 404 when Resend env vars are missing", async () => {
+    resetEnvCache();
+    const env = loadEnv({
+      VEXA_API_KEY: "test-vexa-key",
+      RESEND_API_KEY: undefined,
+      RESEND_WEBHOOK_SECRET: undefined,
+    });
+
+    const app = Fastify({ logger: false });
+    await registerResendWebhookRoutes(app, {
+      env,
+      logger: createLogger(env),
+      orchestrator: { join: vi.fn() } as unknown as JoinOrchestrator,
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/webhooks/resend",
+      headers: { "content-type": "application/json" },
+      payload: "{}",
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error).toBe("webhook_not_configured");
+    await app.close();
   });
 });

@@ -1,5 +1,17 @@
 import { z } from "zod";
 
+function emptyStringToUndefined(value: unknown): unknown {
+  if (typeof value === "string" && value.trim() === "") {
+    return undefined;
+  }
+  return value;
+}
+
+const optionalNonEmptyString = z.preprocess(
+  emptyStringToUndefined,
+  z.string().optional(),
+);
+
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z
@@ -11,8 +23,8 @@ const envSchema = z.object({
   BOT_EMAIL: z.string().email().optional(),
   BOT_DISPLAY_NAME: z.string().default("Central Agent Bot"),
 
-  RESEND_API_KEY: z.string().optional(),
-  RESEND_WEBHOOK_SECRET: z.string().optional(),
+  RESEND_API_KEY: optionalNonEmptyString,
+  RESEND_WEBHOOK_SECRET: optionalNonEmptyString,
 
   INVITE_SENDER_MODE: z.enum(["strict", "domain", "open"]).default("open"),
   ALLOWED_INVITE_SENDERS: z.string().default(""),

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { Resend } from "resend";
 import type { Env } from "../config/env.js";
+import { isResendWebhookEnabled } from "../config/resend.js";
 import type { Logger } from "../logging/logger.js";
 import type { JoinOrchestrator } from "../orchestrator/join.js";
 import {
@@ -44,36 +45,34 @@ export async function registerResendWebhookRoutes(
   options: RegisterResendWebhookOptions,
 ): Promise<void> {
   const { env, logger, orchestrator } = options;
+  const enabled = isResendWebhookEnabled(env);
 
-  if (!env.RESEND_API_KEY || !env.RESEND_WEBHOOK_SECRET) {
-    logger.warn(
-      "Resend webhook disabled: set RESEND_API_KEY and RESEND_WEBHOOK_SECRET",
-    );
-    return;
-  }
+  const processor = enabled
+    ? (options.processor ??
+      new EmailInviteProcessor({
+        env,
+        logger,
+        orchestrator,
+        resendClient: new ResendReceivingService(env.RESEND_API_KEY!),
+      }))
+    : undefined;
 
-  const resend = new Resend(env.RESEND_API_KEY);
-  const processor =
-    options.processor ??
-    new EmailInviteProcessor({
-      env,
-      logger,
-      orchestrator,
-      resendClient: new ResendReceivingService(env.RESEND_API_KEY),
-    });
+  const resend = enabled ? new Resend(env.RESEND_API_KEY!) : null;
 
   const verifyWebhook =
     options.verifyWebhook ??
-    ((payload, headers) =>
-      resend.webhooks.verify({
-        payload,
-        headers: {
-          id: headers["svix-id"] ?? "",
-          timestamp: headers["svix-timestamp"] ?? "",
-          signature: headers["svix-signature"] ?? "",
-        },
-        webhookSecret: env.RESEND_WEBHOOK_SECRET!,
-      }) as EmailReceivedEvent | { type: string });
+    (enabled && resend
+      ? (payload, headers) =>
+          resend.webhooks.verify({
+            payload,
+            headers: {
+              id: headers["svix-id"] ?? "",
+              timestamp: headers["svix-timestamp"] ?? "",
+              signature: headers["svix-signature"] ?? "",
+            },
+            webhookSecret: env.RESEND_WEBHOOK_SECRET!,
+          }) as EmailReceivedEvent | { type: string }
+      : undefined);
 
   await app.register(async (webhookApp) => {
     webhookApp.addContentTypeParser(
@@ -85,6 +84,15 @@ export async function registerResendWebhookRoutes(
     );
 
     webhookApp.post("/webhooks/resend", async (request, reply) => {
+      if (!enabled || !processor || !verifyWebhook) {
+        return reply.code(503).send({
+          success: false,
+          error: "webhook_not_configured",
+          message:
+            "Set RESEND_API_KEY and RESEND_WEBHOOK_SECRET in .env, then restart the server.",
+        });
+      }
+
       const payload = request.body as string;
 
       let event: EmailReceivedEvent | { type: string };
@@ -117,4 +125,12 @@ export async function registerResendWebhookRoutes(
       return reply.send({ success: true, received: true });
     });
   });
+
+  if (enabled) {
+    logger.info("Resend webhook enabled at POST /webhooks/resend");
+  } else {
+    logger.warn(
+      "Resend webhook route registered but disabled — set RESEND_API_KEY and RESEND_WEBHOOK_SECRET, then restart",
+    );
+  }
 }
