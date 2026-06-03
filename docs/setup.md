@@ -4,7 +4,7 @@
 
 - Node.js 20+
 - [Vexa Cloud](https://vexa.ai/account) API key
-- (Advanced Mode later) [Resend](https://resend.com) API key and webhook
+- (Advanced Mode) [Resend](https://resend.com) API key, webhook secret, and [ngrok](https://ngrok.com) (or other HTTPS tunnel)
 
 See [bot-email-and-deployment.md](./bot-email-and-deployment.md) for email and hosting details.
 

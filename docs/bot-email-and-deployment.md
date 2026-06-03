@@ -1,4 +1,4 @@
-# Bot Email, Resend, and Render — How It Works
+# Bot Email and Resend — How It Works
 
 This guide explains how the bot inbox triggers automatic meeting joins, and how **Resend** and **Render** fit in. No prior knowledge of the codebase is required.
 
@@ -40,10 +40,10 @@ Examples:
 |---------|------|
 | **Resend** | Receives inbound email and sends `email.received` webhooks |
 | **Orchestrator** (this app) | Handles webhooks, parses invites, calls Vexa |
-| **Render** (or any host) | Runs the orchestrator on a public HTTPS URL |
+| **Your app** (localhost + ngrok, or any HTTPS host) | Runs the orchestrator; receives Resend webhooks |
 | **Vexa Cloud** | Launches the meeting bot into Meet or Teams |
 
-Render does **not** receive email. Resend receives mail, then POSTs to your orchestrator’s webhook endpoint.
+Resend receives mail, then POSTs to your orchestrator’s webhook endpoint.
 
 ---
 
@@ -56,11 +56,10 @@ Render does **not** receive email. Resend receives mail, then POSTs to your orch
 | **Public HTTPS URL required?** | No | Yes (for `/webhooks/resend`) |
 | **Join logic** | Same — both call Vexa | Same |
 
-Easy Mode minimum env: `VEXA_API_KEY`, `API_KEY`, `VEXA_API_BASE`.
+Easy Mode minimum env: `VEXA_API_KEY`, `VEXA_API_BASE`.
 
 ```bash
 curl -X POST http://localhost:3000/api/join \
-  -H "X-API-Key: your-api-key" \
   -H "Content-Type: application/json" \
   -d '{"meetingUrl":"https://meet.google.com/abc-defg-hij"}'
 ```
@@ -151,46 +150,21 @@ Copy [`.env.example`](../.env.example) to `.env`, or set the same keys on your h
 | `EMAIL_JOIN_RATE_LIMIT_PER_HOUR` | Optional per-sender rate limit (default 10; 0 = unlimited) |
 | `VEXA_API_BASE` | Vexa API URL |
 | `VEXA_API_KEY` | Vexa authentication |
-| `API_KEY` | Protects `/api/*` routes |
 | `BOT_DISPLAY_NAME` | Bot name shown in the meeting |
 
 Never commit real secrets to git. `.env` is gitignored.
 
 ---
 
-## How Render fits in
+## Hosting the webhook (ngrok)
 
-For local development, use **ngrok** (see [setup.md](./setup.md#ngrok-for-advanced-mode)) instead of a cloud host. [Render](https://render.com) is optional if you want a stable URL without keeping your laptop on.
-
-Example hosted URL (optional):
+For local development, use **ngrok** — see [setup.md](./setup.md#ngrok-for-advanced-mode).
 
 ```text
-https://central-agent-meeting-bot.onrender.com
+https://YOUR-ID.ngrok-free.app/webhooks/resend
 ```
 
-Endpoints:
-
-- `GET /health`
-- `POST /api/join` — Easy Mode
-- `POST /webhooks/resend` — Advanced Mode
-
-```mermaid
-flowchart LR
-  subgraph mail [Email]
-    Invite[Calendar invite] --> Resend[Resend receiving]
-  end
-  subgraph host [Hosted orchestrator]
-    Webhook[POST /webhooks/resend]
-    API[POST /api/join]
-    Join[Parse link + Vexa]
-    Resend -->|email.received| Webhook
-    Webhook --> Join
-    API --> Join
-  end
-  Join --> Vexa[Vexa Cloud] --> Meet[Meeting]
-```
-
-Any host with a public HTTPS URL works the same way (Fly.io, Railway, etc.).
+Any HTTPS host works the same (Render, Railway, etc.) if you prefer a stable URL without keeping your laptop on.
 
 ---
 
@@ -202,7 +176,14 @@ Use the address from Resend dashboard → **Receiving**: `something@abc123.resen
 
 ### Custom domain
 
-Add MX records per [Resend receiving docs](https://resend.com/docs/dashboard/receiving/introduction). Use a subdomain (e.g. `bot.yourdomain.com`) if the root domain already has mail elsewhere.
+Use your own address (e.g. `bot@bot.centralagent.ai`) instead of `@….resend.app`:
+
+1. [Resend → Domains](https://resend.com/domains) → add domain (prefer a **subdomain** like `bot.yourdomain.com` if the root already uses Google/Microsoft mail).
+2. Add the **MX** record Resend shows (priority must be lowest among MX records on that host).
+3. Wait until Resend marks **receiving** as verified.
+4. Set `BOT_EMAIL=anything@bot.yourdomain.com` and use that on calendar invites.
+
+Details: [Resend receiving docs](https://resend.com/docs/dashboard/receiving/introduction).
 
 ---
 
@@ -236,7 +217,7 @@ Implementation tasks: [TODO.md](../TODO.md) Phases 0, 3, 4, 9.
 No. Only mail sent to `BOT_EMAIL` via Resend.
 
 **Do I need the webhook secret for Easy Mode?**  
-No. Easy Mode uses `POST /api/join` with `API_KEY`.
+No. Easy Mode uses `POST /api/join` or the UI at `/`.
 
 **Why register a webhook URL?**  
 Resend pushes `email.received` events to your app. Without a registered URL, the orchestrator never learns that an invite arrived.

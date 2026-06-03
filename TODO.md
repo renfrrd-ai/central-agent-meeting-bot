@@ -2,17 +2,18 @@
 
 Actionable checklist to implement the system described in [PRD.md](PRD.md) and [docs/architecture.md](docs/architecture.md).
 
-**Repository status:** Phases **0–3** implemented (Easy Mode + Vexa Cloud). Advanced Mode (Phase 4), Playwright fallback (Phase 5), and deployment hardening remain.
+**Repository status:** Phases **0–4** implemented (Easy + Advanced Mode on Vexa Cloud). Playwright fallback (Phase 5+) remains.
 
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **0** Foundation | Done | Fastify, TypeScript, Vitest, `GET /health`, env validation |
-| **1** Parsers | Done | Meet + Teams URLs → `MeetingRef` + unit tests (Zoom removed) |
-| **2** Vexa orchestrator | Done | `POST /bots`, poll until `active`, duplicate guard, `GET /meetings` lifecycle |
-| **3** Easy Mode API + UI | Done | `/api/join`, `/api/status`, `/api/leave`, local UI at `/` |
-| **4+** | Not started | Resend webhooks, Playwright fallback, production auth |
+| **1** Parsers | Done | Meet + Teams URLs → `MeetingRef` + unit tests |
+| **2** Vexa orchestrator | Done | `POST /bots`, poll until `active`, duplicate guard |
+| **3** Easy Mode API + UI | Done | `/api/join`, `/api/status`, `/api/leave`, UI at `/` |
+| **4** Advanced Mode (email) | Done | Resend webhook, invite extraction, auto-join |
+| **5+** | Not started | Playwright fallback, production hardening |
 
-**Verified locally:** `npm test` (28 tests), `npm run build`, `npm run dev` → http://localhost:3000
+**Verified:** `npm test`, `npm run build`, `npm run dev` → http://localhost:3000
 
 ---
 
@@ -53,7 +54,6 @@ flowchart LR
     Vexa[Vexa_API]
     Meet[GoogleMeet]
     Teams[MicrosoftTeams]
-    Zoom[Zoom]
   end
   URL --> Parser
   Email --> Parser
@@ -64,7 +64,6 @@ flowchart LR
   Auth --> Fallback
   Vexa --> Meet
   Vexa --> Teams
-  Vexa --> Zoom
   Fallback --> Meet
 ```
 
@@ -92,7 +91,6 @@ VEXA_API_KEY=...
 RESEND_API_KEY=...
 RESEND_WEBHOOK_SECRET=whsec_...
 BOT_EMAIL=you@your-id.resend.app
-INVITE_SENDER_MODE=open
 ```
 
 ### Vexa (cloud → self-hosted later)
@@ -105,9 +103,9 @@ INVITE_SENDER_MODE=open
 ### Inbound email (Resend)
 
 - [x] Email provider: **Resend** (`email.received` webhook)
-- [ ] Copy receiving address from Resend dashboard → `BOT_EMAIL`
-- [ ] Set `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET` in `.env`
-- [ ] Register HTTPS webhook URL in Resend → `/webhooks/resend`
+- [x] `POST /webhooks/resend` with signature verification
+- [x] Invite extraction + `orchestrator.join` from email
+- [ ] Operator: set `BOT_EMAIL`, Resend keys, ngrok webhook URL (see [docs/setup.md](docs/setup.md))
 
 ---
 
@@ -117,19 +115,17 @@ Create incrementally per phase:
 
 ```
 src/
-  api/              # Fastify routes (Easy Mode)
-  email/            # Webhook handler + invite parser (Advanced Mode)
-  orchestrator/     # Join pipeline, idempotency, retries
-  vexa/             # Vexa HTTP client + types
-  playwright/       # Fallback joiners per platform
-  auth/             # Session/cookie persistence
-  parsers/          # URL → platform + native_meeting_id + passcode
-  logging/          # Structured lifecycle events
-  config/           # Env validation (zod)
+  api/              # Easy Mode routes
+  webhooks/         # Resend webhook route
+  email/            # Invite processor, Resend client, extractor
+  orchestrator/     # Join pipeline
+  vexa/             # Vexa HTTP client
+  parsers/          # URL → MeetingRef
+  config/           # Env (zod)
+  logging/
+public/             # Easy Mode UI
 tests/
-docs/
-  setup.md          # Env, Vexa, email, local dev
-  runbook.md        # Failures, re-auth, ops
+docs/               # setup, architecture, bot-email guide
 .env.example
 ```
 
@@ -233,36 +229,18 @@ docs/
 
 ## Phase 4 — Advanced Mode (email listener)
 
-**Blocked by:** Phase 3 (reuse same `orchestrator.join`)  
-**Acceptance:** Sending a calendar invite with a Meet link to the bot inbox results in automatic join without calling `/api/join`.
+**Blocked by:** Phase 3  
+**Acceptance:** Calendar invite with Meet/Teams link to `BOT_EMAIL` auto-joins without `/api/join`.  
+**Status:** Done (2026-06)
 
-### 4a — Resend webhook infrastructure
-
-- [ ] Resend receiving address or custom domain MX
-- [ ] `POST /webhooks/resend` — verify signature with `RESEND_WEBHOOK_SECRET`
-- [ ] Handle `email.received` — fetch body via `resend.emails.receiving.get()` (`RESEND_API_KEY`)
-- [ ] Register public HTTPS URL in Resend (tunnel for local dev)
-
-### 4b — Security (required)
-
-- [ ] `src/email/sender-allowlist.ts` — `isSenderAllowed(from)` using env:
-  - [ ] `INVITE_SENDER_MODE=strict` — only `ALLOWED_INVITE_SENDERS` (exact match)
-  - [ ] `INVITE_SENDER_MODE=domain` — any `@ALLOWED_INVITE_DOMAINS` + `ALLOWED_INVITE_SENDERS`
-  - [ ] `INVITE_SENDER_MODE=open` — allow all (log warning; dev only)
-- [ ] Parse `From` header formats (`user@domain.com`, `Name <user@domain.com>`)
-- [ ] Reject auto-replies (`Auto-Submitted`, `X-Auto-Response-Suppress`)
-- [ ] Rate limit joins per sender / per hour
-- [ ] Never treat email body as instructions — only extract meeting links
-- [ ] Log and drop emails that fail validation
-
-### 4c — Invite extraction and join
-
-- [ ] `src/email/invite-extractor.ts` — parse HTML/plain + ICS for Meet/Teams/Zoom URLs
-- [ ] Reuse `parseMeetingUrl` on extracted links
-- [ ] Dedup store: `message-id` / calendar UID → skip if already processed
-- [ ] On success: call `orchestrator.join` with `trigger: "email"` and correlation ID
-- [ ] Unit tests: sample invite HTML/ICS fixtures
-- [ ] E2E manual checklist in `docs/setup.md`: invite bot email → verify join
+- [x] `POST /webhooks/resend` — verify signature, handle `email.received`
+- [x] Fetch email via Resend API; extract Meet/Teams links from HTML/text/ICS
+- [x] Dedup by `email_id` / `message-id`; rate limit per sender
+- [x] Reject auto-replies; open sender policy (any inviter)
+- [x] `orchestrator.join` with `source: "email"`
+- [x] Tests: `tests/email/*`, `tests/webhooks/resend.test.ts`
+- [x] Docs: ngrok + Advanced Mode in [docs/setup.md](docs/setup.md)
+- [ ] Operator smoke test on real calendar invite (manual)
 
 ---
 
