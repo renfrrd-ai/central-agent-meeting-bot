@@ -8,7 +8,7 @@ import { DedupStore } from "./dedup-store.js";
 import { extractMeetingRefFromInvite } from "./invite-extractor.js";
 import { SenderRateLimiter } from "./rate-limit.js";
 import type { ResendReceivingClient } from "./resend-client.js";
-import { isSenderAllowed, parseEmailAddress } from "./sender-allowlist.js";
+import { parseEmailAddress } from "./parse-from.js";
 
 export interface EmailReceivedEvent {
   type: "email.received";
@@ -68,11 +68,6 @@ export class EmailInviteProcessor {
 
     if (!this.dedupStore.tryMark(`email:${emailId}`)) {
       this.logger.info({ emailId }, "email_duplicate_skipped");
-      return;
-    }
-
-    if (!isSenderAllowed(from, this.env)) {
-      this.logger.warn({ from: sender, emailId }, "email_sender_rejected");
       return;
     }
 

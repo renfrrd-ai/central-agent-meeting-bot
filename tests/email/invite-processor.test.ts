@@ -8,7 +8,6 @@ import type { ResendReceivingClient } from "../../src/email/resend-client.js";
 
 const testEnv = loadEnv({
   VEXA_API_KEY: "test-key",
-  INVITE_SENDER_MODE: "open",
   BOT_DISPLAY_NAME: "Test Bot",
 });
 
@@ -111,38 +110,5 @@ describe("EmailInviteProcessor", () => {
 
     expect(resendClient.getReceivedEmail).toHaveBeenCalledOnce();
     expect(mockJoin).toHaveBeenCalledOnce();
-  });
-
-  it("rejects disallowed sender in strict mode", async () => {
-    resetEnvCache();
-    const strictEnv = loadEnv({
-      VEXA_API_KEY: "test-key",
-      INVITE_SENDER_MODE: "strict",
-      ALLOWED_INVITE_SENDERS: "allowed@example.com",
-    });
-
-    const mockJoin = vi.fn();
-    const resendClient: ResendReceivingClient = {
-      getReceivedEmail: vi.fn(),
-    };
-
-    const processor = new EmailInviteProcessor({
-      env: strictEnv,
-      logger: createLogger(strictEnv),
-      orchestrator: { join: mockJoin } as unknown as JoinOrchestrator,
-      resendClient,
-    });
-
-    await processor.processEvent({
-      type: "email.received",
-      data: {
-        email_id: "email-2",
-        from: "stranger@example.com",
-        to: ["bot@resend.app"],
-      },
-    });
-
-    expect(resendClient.getReceivedEmail).not.toHaveBeenCalled();
-    expect(mockJoin).not.toHaveBeenCalled();
   });
 });

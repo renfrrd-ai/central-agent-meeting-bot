@@ -26,10 +26,6 @@ const envSchema = z.object({
   RESEND_API_KEY: optionalNonEmptyString,
   RESEND_WEBHOOK_SECRET: optionalNonEmptyString,
 
-  INVITE_SENDER_MODE: z.enum(["strict", "domain", "open"]).default("open"),
-  ALLOWED_INVITE_SENDERS: z.string().default(""),
-  ALLOWED_INVITE_DOMAINS: z.string().default(""),
-
   RECORDING_ENABLED: z
     .string()
     .optional()
@@ -81,11 +77,4 @@ export function loadEnv(overrides?: Record<string, string | undefined>): Env {
 
 export function resetEnvCache(): void {
   cached = undefined;
-}
-
-export function parseCsvList(value: string): string[] {
-  return value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
 }
