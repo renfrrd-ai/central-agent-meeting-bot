@@ -24,7 +24,7 @@ For meetings that require a signed-in user (or Playwright fallback later):
 
 1. **Create** a dedicated bot account externally (e.g. `renfredbot@gmail.com` or `bot@yourdomain.com`) — normal Google sign-up, not in this repo.
 2. **Use that address** on calendar invites (`BOT_EMAIL` / Advanced Mode).
-3. **One-time login** (planned Phase 6): run `npm run auth:google`, sign in as the bot in a browser, save session to `data/sessions/` — not per meeting, only when cookies expire.
+3. **One-time login**: run `npm run auth:google`, sign in as the bot in a browser, save session to `data/sessions/` — not per meeting, only when cookies expire (used by the Playwright fallback below).
 
 You do **not** sign up inside the orchestrator app. The app only stores API keys and (later) saved browser sessions.
 
@@ -108,9 +108,44 @@ curl -X POST http://localhost:3000/api/leave \
 3. Send a calendar invite to `BOT_EMAIL` with a Google Meet or Teams link.
 4. Watch server logs for `email_join_triggered` and `join_succeeded`.
 
-## Tests
+## Playwright fallback (Google Meet)
+
+When a Vexa join fails with a **retriable** error (5xx, 429, or a network error), the
+orchestrator falls back to joining Google Meet directly in Chromium. Deterministic Vexa
+errors (4xx — bad URL, invalid key) never trigger the fallback.
+
+### One-time browser setup
 
 ```bash
-npm test
+npx playwright install chromium   # download the browser binary
+npm run auth:google               # sign in once; saves data/sessions/google_meet.json
+```
+
+### Behavior & config
+
+| Var | Default | Effect |
+|-----|---------|--------|
+| `FALLBACK_ENABLED` | `true` | Set `false` to disable the fallback entirely |
+| `HEADLESS` | `true` | Set `false` to watch the browser join |
+| `PLAYWRIGHT_SESSION_DIR` | `./data/sessions` | Where the saved Google session lives |
+
+- Without a saved session, the bot joins as a **guest** using `BOT_DISPLAY_NAME`; many Meet
+  links then require a host to admit it from the lobby (`awaiting_admission`).
+- On failure, a screenshot is written to `logs/screenshots/` and a `fallback_failed` event is logged.
+
+## Graceful shutdown
+
+On `SIGTERM` / `SIGINT` the app stops accepting requests, asks Vexa to stop any bots it
+started this session, and closes any open fallback browsers (`shutdown_started` →
+`bot_stopped` in the logs).
+
+## Tests & CI
+
+```bash
+npm test         # vitest (browsers not required)
+npm run typecheck
+npm run lint
 npm run build
 ```
+
+CI runs the same four steps on every push/PR — see `.github/workflows/ci.yml`.
